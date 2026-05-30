@@ -2,59 +2,34 @@ package store
 
 import (
 	"context"
-	"embed"
+	"database/sql"
 	"fmt"
-	"sort"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver
+	"github.com/pressly/goose/v3"
+
+	"github.com/substrate/substrate/internal/migrations"
 )
 
-//go:embed migrations/*.sql
-var migrationFS embed.FS
-
-// Migrate applies every embedded migration that has not yet been recorded.
+// Migrate applies all embedded goose migrations using a temporary database/sql
+// connection derived from the pool's DSN. The signature is unchanged so the test
+// harness and bootstrap keep calling it the same way.
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
-	if _, err := pool.Exec(ctx,
-		`CREATE TABLE IF NOT EXISTS schema_migrations (
-			name text PRIMARY KEY,
-			applied_at timestamptz NOT NULL DEFAULT now()
-		)`); err != nil {
-		return fmt.Errorf("ensure schema_migrations: %w", err)
-	}
-
-	entries, err := migrationFS.ReadDir("migrations")
+	dsn := pool.Config().ConnString()
+	sqlDB, err := sql.Open("pgx", dsn)
 	if err != nil {
-		return fmt.Errorf("read migrations: %w", err)
+		return fmt.Errorf("open sql db for migrations: %w", err)
 	}
-	names := make([]string, 0, len(entries))
-	for _, e := range entries {
-		if !e.IsDir() {
-			names = append(names, e.Name())
-		}
-	}
-	sort.Strings(names)
+	defer sqlDB.Close()
 
-	for _, name := range names {
-		var exists bool
-		if err := pool.QueryRow(ctx,
-			`SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE name=$1)`, name,
-		).Scan(&exists); err != nil {
-			return fmt.Errorf("check %s: %w", name, err)
-		}
-		if exists {
-			continue
-		}
-		sqlBytes, err := migrationFS.ReadFile("migrations/" + name)
-		if err != nil {
-			return fmt.Errorf("read %s: %w", name, err)
-		}
-		if _, err := pool.Exec(ctx, string(sqlBytes)); err != nil {
-			return fmt.Errorf("apply %s: %w", name, err)
-		}
-		if _, err := pool.Exec(ctx,
-			`INSERT INTO schema_migrations(name) VALUES($1)`, name); err != nil {
-			return fmt.Errorf("record %s: %w", name, err)
-		}
+	goose.SetBaseFS(migrations.FS)
+	goose.SetLogger(goose.NopLogger())
+	if err := goose.SetDialect("postgres"); err != nil {
+		return fmt.Errorf("set goose dialect: %w", err)
+	}
+	if err := goose.UpContext(ctx, sqlDB, "."); err != nil {
+		return fmt.Errorf("goose up: %w", err)
 	}
 	return nil
 }

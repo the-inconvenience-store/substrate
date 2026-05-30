@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE workspaces (
     id          uuid PRIMARY KEY,
     name        text NOT NULL,
@@ -58,3 +59,10 @@ CREATE INDEX events_record_idx ON events(collection_id, record_id, seq);
 CREATE UNIQUE INDEX events_idempotency_idx
     ON events(workspace_id, idempotency_key)
     WHERE idempotency_key IS NOT NULL;
+
+-- +goose Down
+DROP TABLE IF EXISTS events;
+DROP TABLE IF EXISTS records;
+DROP TABLE IF EXISTS collections;
+DROP TABLE IF EXISTS api_keys;
+DROP TABLE IF EXISTS workspaces;

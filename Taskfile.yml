@@ -27,6 +27,11 @@ tasks:
     cmds:
       - go vet ./...
 
+  sqlc:generate:
+    desc: Regenerate the sqlc db package
+    cmds:
+      - go tool sqlc generate
+
   run:
     desc: Run the server
     cmds:
