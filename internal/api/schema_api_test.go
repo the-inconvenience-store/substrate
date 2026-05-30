@@ -77,7 +77,9 @@ func TestSchemaLifecycleOverHTTP(t *testing.T) {
 	// Register v2 breaking (adds required age), then activate -> 409.
 	resp = sreq(t, "POST", base+"/schemas", key,
 		`{"json_schema":{"type":"object","properties":{"name":{"type":"string"},"age":{"type":"integer"}},"required":["name","age"]}}`)
-	var reg struct{ Version int `json:"version"` }
+	var reg struct {
+		Version int `json:"version"`
+	}
 	_ = json.NewDecoder(resp.Body).Decode(&reg)
 	resp.Body.Close()
 

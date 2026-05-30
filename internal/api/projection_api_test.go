@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/substrate/substrate/internal/collection"
+	"github.com/substrate/substrate/internal/policy"
 	"github.com/substrate/substrate/internal/projection"
 	"github.com/substrate/substrate/internal/query"
 	"github.com/substrate/substrate/internal/record"
@@ -34,13 +35,16 @@ func newProjServer(t *testing.T) (*httptest.Server, string, string, uuid.UUID) {
 	}
 	const adminToken = "admin-secret"
 	reg := schema.NewWithIndexer(pool, query.NewIndexer(pool))
+	engine := policy.NewEngine(pool)
 	srv := httptest.NewServer(NewRouter(Deps{
 		Workspaces:  wsSvc,
 		Collections: collection.New(pool),
 		Records:     record.New(pool, schema.NewValidator(reg)),
 		Schemas:     reg,
+		Policies:    policy.NewService(pool),
 		Backfiller:  projection.NewBackfiller(pool, reg),
 		Replayer:    projection.NewReplayer(pool),
+		Evaluator:   engine,
 		AdminToken:  adminToken,
 	}))
 	t.Cleanup(srv.Close)
@@ -135,4 +139,49 @@ func TestBackfillAndReplayOverHTTP(t *testing.T) {
 		t.Fatalf("toggle = %d", resp.StatusCode)
 	}
 	resp.Body.Close()
+}
+
+func TestBackfillDeniedByPolicy(t *testing.T) {
+	srv, key, _, _ := newProjServer(t)
+
+	resp := doAs(t, "POST", srv.URL+"/v1/collections", key, "agent-1", map[string]any{"name": "orders"})
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("collection = %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	// Deny the backfill-management operation on this collection.
+	resp = doAs(t, "POST", srv.URL+"/v1/policies", key, "agent-1", map[string]any{
+		"collection": "orders", "operation": "backfill", "effect": "deny",
+	})
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("policy create = %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	// Manual backfill is now forbidden.
+	resp = doAs(t, "POST", srv.URL+"/v1/collections/orders/backfill", key, "agent-1", nil)
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("backfill = %d, want 403", resp.StatusCode)
+	}
+	var env struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	json.NewDecoder(resp.Body).Decode(&env)
+	resp.Body.Close()
+	if env.Error.Code != "policy_denied" {
+		t.Fatalf("code = %q, want policy_denied", env.Error.Code)
+	}
+
+	// The auto-backfill toggle is gated by the same operation.
+	resp = doAs(t, "POST", srv.URL+"/v1/collections/orders/auto-backfill", key, "agent-1", map[string]any{"enabled": true})
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("toggle = %d, want 403", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	// A denial event was recorded on the audit timeline (type policy_denied).
+	// (Audit endpoint is not wired in newProjServer; presence is covered by policy tests.)
 }

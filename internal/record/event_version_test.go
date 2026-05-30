@@ -25,7 +25,7 @@ func TestCreateEventCarriesSchemaVersion(t *testing.T) {
 	if _, err := reg.Register(ctx, schema.RegisterCmd{
 		Workspace: ws.ID, Collection: col.ID, Actor: "t",
 		JSONSchema: map[string]any{"type": "object", "properties": map[string]any{"a": map[string]any{"type": "string"}}},
-		Activate:  true,
+		Activate:   true,
 	}); err != nil {
 		t.Fatalf("register: %v", err)
 	}

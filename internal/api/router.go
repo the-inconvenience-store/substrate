@@ -24,6 +24,7 @@ type Deps struct {
 	Audit       *audit.Service
 	Backfiller  *projection.Backfiller
 	Replayer    *projection.Replayer
+	Evaluator   policy.Evaluator
 	AdminToken  string
 }
 
@@ -67,7 +68,7 @@ func NewRouter(d Deps) http.Handler {
 	aud := &auditHandlers{h: h, audit: d.Audit}
 	api.HandleFunc("GET /v1/audit", aud.list)
 
-	pjh := &projectionHandlers{h: h, backfiller: d.Backfiller}
+	pjh := &projectionHandlers{h: h, backfiller: d.Backfiller, eval: d.Evaluator}
 	api.HandleFunc("POST /v1/collections/{collection}/backfill", pjh.backfill)
 	api.HandleFunc("POST /v1/collections/{collection}/auto-backfill", pjh.setAutoBackfill)
 
