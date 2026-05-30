@@ -50,10 +50,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	schemaReg := schema.New(pool)
 	router := api.NewRouter(api.Deps{
 		Workspaces:  workspace.New(pool),
 		Collections: collection.New(pool),
-		Records:     record.New(pool, schema.NewValidator(schema.New(pool))),
+		Records:     record.New(pool, schema.NewValidator(schemaReg)),
+		Schemas:     schemaReg,
 		AdminToken:  cfg.AdminToken,
 	})
 
