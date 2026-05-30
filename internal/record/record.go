@@ -139,6 +139,7 @@ func (s *Service) Create(ctx context.Context, cmd CreateCmd) (Record, error) {
 			Type: "create", Revision: 1, State: rec.Data, Actor: cmd.Actor,
 			IdempotencyKey: cmd.IdempotencyKey,
 			Trace:          s.policyTrace(dec, policy.OpCreate),
+			SchemaVersion:  sv,
 		}); err != nil {
 			return err
 		}
@@ -294,6 +295,7 @@ func (s *Service) Update(ctx context.Context, cmd UpdateCmd) (Record, error) {
 			Type: "update", Revision: next, State: cmd.Data, Actor: cmd.Actor,
 			IdempotencyKey: cmd.IdempotencyKey,
 			Trace:          s.policyTrace(dec, policy.OpUpdate),
+			SchemaVersion:  sv,
 		}); err != nil {
 			return err
 		}
@@ -349,7 +351,8 @@ func (s *Service) Delete(ctx context.Context, ws, col, id uuid.UUID, actor strin
 		if err := appendEvent(ctx, qtx, eventRow{
 			Workspace: ws, Collection: col, RecordID: id,
 			Type: "delete", Revision: next, State: data, Actor: actor,
-			Trace: s.policyTrace(dec, policy.OpDelete),
+			Trace:         s.policyTrace(dec, policy.OpDelete),
+			SchemaVersion: row.SchemaVersion,
 		}); err != nil {
 			return err
 		}
@@ -371,6 +374,7 @@ type eventRow struct {
 	Actor          string
 	IdempotencyKey string
 	Trace          []byte
+	SchemaVersion  pgtype.Int4
 }
 
 // errIdempotencyConflict is a sentinel returned by appendEvent when the INSERT
@@ -385,6 +389,7 @@ func appendEvent(ctx context.Context, q *db.Queries, e eventRow) error {
 		StateAfter: mustJSON(e.State), Actor: textOrNull(e.Actor),
 		IdempotencyKey: textOrNull(e.IdempotencyKey),
 		Trace:          e.Trace,
+		SchemaVersion:  e.SchemaVersion,
 	})
 	if err != nil {
 		var pgErr *pgconn.PgError

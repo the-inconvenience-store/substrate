@@ -49,18 +49,28 @@ type Indexer interface {
 	EnsureCollectionIndexes(ctx context.Context, collectionID uuid.UUID, fields []string) error
 }
 
+// BackfillEnqueuer is notified when a collection's active version changes and the
+// collection has opted into auto-backfill.
+type BackfillEnqueuer interface {
+	Enqueue(workspace, collection uuid.UUID)
+}
+
 // Service manages the schema registry.
 type Service struct {
-	pool    *pgxpool.Pool
-	q       *db.Queries
-	indexer Indexer
-	eval    policy.Evaluator
+	pool     *pgxpool.Pool
+	q        *db.Queries
+	indexer  Indexer
+	eval     policy.Evaluator
+	backfill BackfillEnqueuer
 }
 
 func New(pool *pgxpool.Pool) *Service { return &Service{pool: pool, q: db.New(pool)} }
 
 // WithEvaluator wires an optional policy evaluator. nil ⇒ no enforcement.
 func (s *Service) WithEvaluator(e policy.Evaluator) *Service { s.eval = e; return s }
+
+// WithBackfillEnqueuer wires an optional backfill enqueuer invoked after activations.
+func (s *Service) WithBackfillEnqueuer(e BackfillEnqueuer) *Service { s.backfill = e; return s }
 
 func (s *Service) authorize(ctx context.Context, req policy.Request) (policy.Decision, error) {
 	if s.eval == nil {
@@ -106,6 +116,18 @@ func (s *Service) ensureActiveIndexes(ctx context.Context, col uuid.UUID) error 
 		return nil
 	}
 	return s.indexer.EnsureCollectionIndexes(ctx, col, fields)
+}
+
+// enqueueBackfill signals the worker after an activation if the collection opted in.
+func (s *Service) enqueueBackfill(ctx context.Context, ws, col uuid.UUID) {
+	if s.backfill == nil {
+		return
+	}
+	on, err := s.q.GetCollectionAutoBackfill(ctx, col)
+	if err != nil || !on {
+		return
+	}
+	s.backfill.Enqueue(ws, col)
 }
 
 // compileSchema validates that doc is a usable JSON Schema (draft 2020-12).
@@ -198,6 +220,7 @@ func (s *Service) Register(ctx context.Context, cmd RegisterCmd) (SchemaVersion,
 		if ierr := s.ensureActiveIndexes(ctx, cmd.Collection); ierr != nil {
 			return SchemaVersion{}, ierr
 		}
+		s.enqueueBackfill(ctx, cmd.Workspace, cmd.Collection)
 	}
 	return result, nil
 }
@@ -342,7 +365,11 @@ func (s *Service) Activate(ctx context.Context, ws, col uuid.UUID, version int, 
 	}); err != nil {
 		return err
 	}
-	return s.ensureActiveIndexes(ctx, col)
+	if err := s.ensureActiveIndexes(ctx, col); err != nil {
+		return err
+	}
+	s.enqueueBackfill(ctx, ws, col)
+	return nil
 }
 
 // Deprecate marks a non-active version deprecated.

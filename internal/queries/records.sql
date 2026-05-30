@@ -14,10 +14,37 @@ WHERE workspace_id = $1 AND collection_id = $2 AND id = $3 AND status = 'active'
 FOR UPDATE;
 
 -- name: GetRecordForUpdate :one
-SELECT revision, data
+SELECT revision, data, schema_version
 FROM records
 WHERE workspace_id = $1 AND collection_id = $2 AND id = $3 AND status = 'active'
 FOR UPDATE;
+
+-- name: ListRecordsBelowVersion :many
+SELECT id, data, revision, schema_version
+FROM records
+WHERE collection_id = $1 AND status = 'active'
+  AND (schema_version IS NULL OR schema_version < $2)
+  AND id > $3
+ORDER BY id
+LIMIT $4;
+
+-- name: CountRecordsBelowVersion :one
+SELECT count(*)
+FROM records
+WHERE collection_id = $1 AND status = 'active'
+  AND (schema_version IS NULL OR schema_version < $2);
+
+-- name: UpsertRecordProjection :exec
+INSERT INTO records (id, collection_id, workspace_id, data, revision, status, actor, schema_version)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+ON CONFLICT (collection_id, id) DO UPDATE
+SET data = EXCLUDED.data, revision = EXCLUDED.revision, status = EXCLUDED.status,
+    actor = EXCLUDED.actor, schema_version = EXCLUDED.schema_version, updated_at = now();
+
+-- name: ListRecordIDsInCollection :many
+SELECT DISTINCT record_id
+FROM events
+WHERE workspace_id = $1 AND collection_id = $2 AND record_id <> collection_id AND type <> 'policy_denied';
 
 -- name: UpdateRecordData :exec
 UPDATE records SET data = $4, revision = $5, actor = $6, schema_version = $7, updated_at = now()

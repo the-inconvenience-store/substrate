@@ -12,6 +12,25 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countRecordsBelowVersion = `-- name: CountRecordsBelowVersion :one
+SELECT count(*)
+FROM records
+WHERE collection_id = $1 AND status = 'active'
+  AND (schema_version IS NULL OR schema_version < $2)
+`
+
+type CountRecordsBelowVersionParams struct {
+	CollectionID  uuid.UUID   `json:"collection_id"`
+	SchemaVersion pgtype.Int4 `json:"schema_version"`
+}
+
+func (q *Queries) CountRecordsBelowVersion(ctx context.Context, arg CountRecordsBelowVersionParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countRecordsBelowVersion, arg.CollectionID, arg.SchemaVersion)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const getActiveRecord = `-- name: GetActiveRecord :one
 SELECT id, collection_id, data, revision, status, actor
 FROM records
@@ -68,7 +87,7 @@ func (q *Queries) GetAnyRecordRevisionForUpdate(ctx context.Context, arg GetAnyR
 }
 
 const getRecordForUpdate = `-- name: GetRecordForUpdate :one
-SELECT revision, data
+SELECT revision, data, schema_version
 FROM records
 WHERE workspace_id = $1 AND collection_id = $2 AND id = $3 AND status = 'active'
 FOR UPDATE
@@ -81,14 +100,15 @@ type GetRecordForUpdateParams struct {
 }
 
 type GetRecordForUpdateRow struct {
-	Revision int64  `json:"revision"`
-	Data     []byte `json:"data"`
+	Revision      int64       `json:"revision"`
+	Data          []byte      `json:"data"`
+	SchemaVersion pgtype.Int4 `json:"schema_version"`
 }
 
 func (q *Queries) GetRecordForUpdate(ctx context.Context, arg GetRecordForUpdateParams) (GetRecordForUpdateRow, error) {
 	row := q.db.QueryRow(ctx, getRecordForUpdate, arg.WorkspaceID, arg.CollectionID, arg.ID)
 	var i GetRecordForUpdateRow
-	err := row.Scan(&i.Revision, &i.Data)
+	err := row.Scan(&i.Revision, &i.Data, &i.SchemaVersion)
 	return i, err
 }
 
@@ -138,6 +158,91 @@ func (q *Queries) InsertRecord(ctx context.Context, arg InsertRecordParams) erro
 		arg.SchemaVersion,
 	)
 	return err
+}
+
+const listRecordIDsInCollection = `-- name: ListRecordIDsInCollection :many
+SELECT DISTINCT record_id
+FROM events
+WHERE workspace_id = $1 AND collection_id = $2 AND record_id <> collection_id AND type <> 'policy_denied'
+`
+
+type ListRecordIDsInCollectionParams struct {
+	WorkspaceID  uuid.UUID `json:"workspace_id"`
+	CollectionID uuid.UUID `json:"collection_id"`
+}
+
+func (q *Queries) ListRecordIDsInCollection(ctx context.Context, arg ListRecordIDsInCollectionParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listRecordIDsInCollection, arg.WorkspaceID, arg.CollectionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var record_id uuid.UUID
+		if err := rows.Scan(&record_id); err != nil {
+			return nil, err
+		}
+		items = append(items, record_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRecordsBelowVersion = `-- name: ListRecordsBelowVersion :many
+SELECT id, data, revision, schema_version
+FROM records
+WHERE collection_id = $1 AND status = 'active'
+  AND (schema_version IS NULL OR schema_version < $2)
+  AND id > $3
+ORDER BY id
+LIMIT $4
+`
+
+type ListRecordsBelowVersionParams struct {
+	CollectionID  uuid.UUID   `json:"collection_id"`
+	SchemaVersion pgtype.Int4 `json:"schema_version"`
+	ID            uuid.UUID   `json:"id"`
+	Limit         int32       `json:"limit"`
+}
+
+type ListRecordsBelowVersionRow struct {
+	ID            uuid.UUID   `json:"id"`
+	Data          []byte      `json:"data"`
+	Revision      int64       `json:"revision"`
+	SchemaVersion pgtype.Int4 `json:"schema_version"`
+}
+
+func (q *Queries) ListRecordsBelowVersion(ctx context.Context, arg ListRecordsBelowVersionParams) ([]ListRecordsBelowVersionRow, error) {
+	rows, err := q.db.Query(ctx, listRecordsBelowVersion,
+		arg.CollectionID,
+		arg.SchemaVersion,
+		arg.ID,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListRecordsBelowVersionRow
+	for rows.Next() {
+		var i ListRecordsBelowVersionRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Data,
+			&i.Revision,
+			&i.SchemaVersion,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const revertRecordData = `-- name: RevertRecordData :exec
@@ -208,6 +313,39 @@ func (q *Queries) UpdateRecordData(ctx context.Context, arg UpdateRecordDataPara
 		arg.ID,
 		arg.Data,
 		arg.Revision,
+		arg.Actor,
+		arg.SchemaVersion,
+	)
+	return err
+}
+
+const upsertRecordProjection = `-- name: UpsertRecordProjection :exec
+INSERT INTO records (id, collection_id, workspace_id, data, revision, status, actor, schema_version)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+ON CONFLICT (collection_id, id) DO UPDATE
+SET data = EXCLUDED.data, revision = EXCLUDED.revision, status = EXCLUDED.status,
+    actor = EXCLUDED.actor, schema_version = EXCLUDED.schema_version, updated_at = now()
+`
+
+type UpsertRecordProjectionParams struct {
+	ID            uuid.UUID   `json:"id"`
+	CollectionID  uuid.UUID   `json:"collection_id"`
+	WorkspaceID   uuid.UUID   `json:"workspace_id"`
+	Data          []byte      `json:"data"`
+	Revision      int64       `json:"revision"`
+	Status        string      `json:"status"`
+	Actor         pgtype.Text `json:"actor"`
+	SchemaVersion pgtype.Int4 `json:"schema_version"`
+}
+
+func (q *Queries) UpsertRecordProjection(ctx context.Context, arg UpsertRecordProjectionParams) error {
+	_, err := q.db.Exec(ctx, upsertRecordProjection,
+		arg.ID,
+		arg.CollectionID,
+		arg.WorkspaceID,
+		arg.Data,
+		arg.Revision,
+		arg.Status,
 		arg.Actor,
 		arg.SchemaVersion,
 	)

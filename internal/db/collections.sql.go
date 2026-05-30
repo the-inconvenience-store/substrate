@@ -48,8 +48,19 @@ func (q *Queries) CreateCollection(ctx context.Context, arg CreateCollectionPara
 	return i, err
 }
 
+const getCollectionAutoBackfill = `-- name: GetCollectionAutoBackfill :one
+SELECT auto_backfill FROM collections WHERE id = $1
+`
+
+func (q *Queries) GetCollectionAutoBackfill(ctx context.Context, id uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, getCollectionAutoBackfill, id)
+	var auto_backfill bool
+	err := row.Scan(&auto_backfill)
+	return auto_backfill, err
+}
+
 const getCollectionByName = `-- name: GetCollectionByName :one
-SELECT id, workspace_id, name, level
+SELECT id, workspace_id, name, level, auto_backfill
 FROM collections
 WHERE workspace_id = $1 AND name = $2
 `
@@ -60,10 +71,11 @@ type GetCollectionByNameParams struct {
 }
 
 type GetCollectionByNameRow struct {
-	ID          uuid.UUID `json:"id"`
-	WorkspaceID uuid.UUID `json:"workspace_id"`
-	Name        string    `json:"name"`
-	Level       string    `json:"level"`
+	ID           uuid.UUID `json:"id"`
+	WorkspaceID  uuid.UUID `json:"workspace_id"`
+	Name         string    `json:"name"`
+	Level        string    `json:"level"`
+	AutoBackfill bool      `json:"auto_backfill"`
 }
 
 func (q *Queries) GetCollectionByName(ctx context.Context, arg GetCollectionByNameParams) (GetCollectionByNameRow, error) {
@@ -74,6 +86,23 @@ func (q *Queries) GetCollectionByName(ctx context.Context, arg GetCollectionByNa
 		&i.WorkspaceID,
 		&i.Name,
 		&i.Level,
+		&i.AutoBackfill,
 	)
 	return i, err
+}
+
+const setAutoBackfill = `-- name: SetAutoBackfill :exec
+UPDATE collections SET auto_backfill = $3, updated_at = now()
+WHERE workspace_id = $1 AND id = $2
+`
+
+type SetAutoBackfillParams struct {
+	WorkspaceID  uuid.UUID `json:"workspace_id"`
+	ID           uuid.UUID `json:"id"`
+	AutoBackfill bool      `json:"auto_backfill"`
+}
+
+func (q *Queries) SetAutoBackfill(ctx context.Context, arg SetAutoBackfillParams) error {
+	_, err := q.db.Exec(ctx, setAutoBackfill, arg.WorkspaceID, arg.ID, arg.AutoBackfill)
+	return err
 }

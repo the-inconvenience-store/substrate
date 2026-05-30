@@ -13,6 +13,7 @@ import (
 	"github.com/substrate/substrate/internal/collection"
 	"github.com/substrate/substrate/internal/config"
 	"github.com/substrate/substrate/internal/policy"
+	"github.com/substrate/substrate/internal/projection"
 	"github.com/substrate/substrate/internal/query"
 	"github.com/substrate/substrate/internal/record"
 	"github.com/substrate/substrate/internal/schema"
@@ -57,6 +58,11 @@ func main() {
 	engine := policy.NewEngine(pool)
 	schemaReg.WithEvaluator(engine)
 
+	backfiller := projection.NewBackfiller(pool, schemaReg)
+	worker := projection.NewWorker(backfiller, 256)
+	go worker.Run(ctx)
+	schemaReg.WithBackfillEnqueuer(worker)
+
 	router := api.NewRouter(api.Deps{
 		Workspaces:  workspace.New(pool),
 		Collections: collection.New(pool),
@@ -64,6 +70,8 @@ func main() {
 		Schemas:     schemaReg,
 		Policies:    policy.NewService(pool),
 		Audit:       audit.New(pool),
+		Backfiller:  backfiller,
+		Replayer:    projection.NewReplayer(pool),
 		AdminToken:  cfg.AdminToken,
 	})
 
