@@ -164,7 +164,7 @@ func (h *handlers) deleteRecord(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, apierr.New(apierr.BadRequest, "invalid id"))
 		return
 	}
-	if err := h.records.Delete(r.Context(), c.WorkspaceID, c.ID, id); err != nil {
+	if err := h.records.Delete(r.Context(), c.WorkspaceID, c.ID, id, auth.ActorFrom(r.Context())); err != nil {
 		writeErr(w, err)
 		return
 	}
@@ -210,7 +210,7 @@ func (h *handlers) revertRecord(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, perr)
 		return
 	}
-	rec, err := h.records.Revert(r.Context(), c.WorkspaceID, c.ID, id, at)
+	rec, err := h.records.Revert(r.Context(), c.WorkspaceID, c.ID, id, at, auth.ActorFrom(r.Context()))
 	if err != nil {
 		writeErr(w, err)
 		return

@@ -86,6 +86,17 @@ func (s *Service) Create(ctx context.Context, cmd CreateCmd) (Record, error) {
 		})
 	})
 	if err != nil {
+		// Concurrent idempotency conflict: the transaction was rolled back and the
+		// winning row is now visible. Re-query outside the aborted transaction.
+		if errors.Is(err, errIdempotencyConflict) && cmd.IdempotencyKey != "" {
+			replayed, ok, rerr := lookupReplay(ctx, s.q, cmd.Workspace, cmd.IdempotencyKey)
+			if rerr != nil {
+				return Record{}, fmt.Errorf("replay after conflict: %w", rerr)
+			}
+			if ok {
+				return replayed, nil
+			}
+		}
 		return Record{}, err
 	}
 	return rec, nil
@@ -158,12 +169,23 @@ func (s *Service) Update(ctx context.Context, cmd UpdateCmd) (Record, error) {
 		return nil
 	})
 	if err != nil {
+		// Concurrent idempotency conflict: the transaction was rolled back and the
+		// winning row is now visible. Re-query outside the aborted transaction.
+		if errors.Is(err, errIdempotencyConflict) && cmd.IdempotencyKey != "" {
+			replayed, ok, rerr := lookupReplay(ctx, s.q, cmd.Workspace, cmd.IdempotencyKey)
+			if rerr != nil {
+				return Record{}, fmt.Errorf("replay after conflict: %w", rerr)
+			}
+			if ok {
+				return replayed, nil
+			}
+		}
 		return Record{}, err
 	}
 	return rec, nil
 }
 
-func (s *Service) Delete(ctx context.Context, ws, col, id uuid.UUID) error {
+func (s *Service) Delete(ctx context.Context, ws, col, id uuid.UUID, actor string) error {
 	return store.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
 		qtx := s.q.WithTx(tx)
 		row, err := qtx.GetRecordForUpdate(ctx, db.GetRecordForUpdateParams{
@@ -180,7 +202,7 @@ func (s *Service) Delete(ctx context.Context, ws, col, id uuid.UUID) error {
 		_ = json.Unmarshal(row.Data, &data)
 		if err := appendEvent(ctx, qtx, eventRow{
 			Workspace: ws, Collection: col, RecordID: id,
-			Type: "delete", Revision: next, State: data,
+			Type: "delete", Revision: next, State: data, Actor: actor,
 		}); err != nil {
 			return err
 		}
@@ -203,6 +225,11 @@ type eventRow struct {
 	IdempotencyKey string
 }
 
+// errIdempotencyConflict is a sentinel returned by appendEvent when the INSERT
+// fails specifically on the idempotency unique index (SQLSTATE 23505). The
+// caller is responsible for performing a post-rollback replay lookup.
+var errIdempotencyConflict = errors.New("idempotency key conflict")
+
 func appendEvent(ctx context.Context, q *db.Queries, e eventRow) error {
 	err := q.AppendEvent(ctx, db.AppendEventParams{
 		ID: uuid.New(), WorkspaceID: e.Workspace, CollectionID: e.Collection,
@@ -213,7 +240,12 @@ func appendEvent(ctx context.Context, q *db.Queries, e eventRow) error {
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			// idempotency collision; the caller's replay lookup handles the happy path
+			if e.IdempotencyKey != "" {
+				// Concurrent duplicate: the winning transaction already committed
+				// this idempotency key. Signal the caller to replay outside the
+				// now-aborted transaction.
+				return errIdempotencyConflict
+			}
 			return apierr.New(apierr.Conflict, "duplicate idempotency key")
 		}
 		return fmt.Errorf("append event: %w", err)

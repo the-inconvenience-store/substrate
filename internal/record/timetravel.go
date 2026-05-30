@@ -72,7 +72,7 @@ func (s *Service) GetAsOf(ctx context.Context, ws, col, id uuid.UUID, at AsOf) (
 
 // Revert appends a new forward "revert" event restoring the record to a prior point.
 // The record is re-activated if it was soft-deleted. Revision bumps by 1.
-func (s *Service) Revert(ctx context.Context, ws, col, id uuid.UUID, to AsOf) (Record, error) {
+func (s *Service) Revert(ctx context.Context, ws, col, id uuid.UUID, to AsOf, actor string) (Record, error) {
 	var rec Record
 	err := store.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
 		qtx := s.q.WithTx(tx)
@@ -92,7 +92,7 @@ func (s *Service) Revert(ctx context.Context, ws, col, id uuid.UUID, to AsOf) (R
 		next := current + 1
 		if err := appendEvent(ctx, qtx, eventRow{
 			Workspace: ws, Collection: col, RecordID: id,
-			Type: "revert", Revision: next, State: state,
+			Type: "revert", Revision: next, State: state, Actor: actor,
 		}); err != nil {
 			return err
 		}
@@ -102,7 +102,7 @@ func (s *Service) Revert(ctx context.Context, ws, col, id uuid.UUID, to AsOf) (R
 		}); err != nil {
 			return err
 		}
-		rec = Record{ID: id, Collection: col, Data: state, Revision: next, Status: "active"}
+		rec = Record{ID: id, Collection: col, Data: state, Revision: next, Status: "active", Actor: actor}
 		return nil
 	})
 	if err != nil {

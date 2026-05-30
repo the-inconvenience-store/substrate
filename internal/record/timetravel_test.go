@@ -38,7 +38,7 @@ func TestHistoryAndAsOfAndRevert(t *testing.T) {
 	}
 
 	// Revert back to revision 1 -> new revision 4 with old data.
-	reverted, err := svc.Revert(ctx, ws, col, rec.ID, AsOf{Revision: 1})
+	reverted, err := svc.Revert(ctx, ws, col, rec.ID, AsOf{Revision: 1}, "test-agent")
 	if err != nil {
 		t.Fatalf("revert: %v", err)
 	}
