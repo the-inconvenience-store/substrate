@@ -96,7 +96,7 @@ func (h *handlers) listRecords(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	items, next, err := h.records.List(r.Context(), c.WorkspaceID, c.ID, q)
+	items, next, err := h.records.List(r.Context(), c.WorkspaceID, c.ID, auth.ActorFrom(r.Context()), q)
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -124,7 +124,7 @@ func (h *handlers) getRecord(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, perr)
 			return
 		}
-		rec, err := h.records.GetAsOf(r.Context(), c.WorkspaceID, c.ID, id, at)
+		rec, err := h.records.GetAsOf(r.Context(), c.WorkspaceID, c.ID, id, at, auth.ActorFrom(r.Context()))
 		if err != nil {
 			writeErr(w, err)
 			return
@@ -132,7 +132,7 @@ func (h *handlers) getRecord(w http.ResponseWriter, r *http.Request) {
 		httpx.JSON(w, http.StatusOK, rec)
 		return
 	}
-	rec, err := h.records.Get(r.Context(), c.WorkspaceID, c.ID, id)
+	rec, err := h.records.Get(r.Context(), c.WorkspaceID, c.ID, id, auth.ActorFrom(r.Context()))
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -206,7 +206,7 @@ func (h *handlers) recordHistory(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, apierr.New(apierr.BadRequest, "invalid id"))
 		return
 	}
-	hist, err := h.records.History(r.Context(), c.WorkspaceID, c.ID, id)
+	hist, err := h.records.History(r.Context(), c.WorkspaceID, c.ID, id, auth.ActorFrom(r.Context()))
 	if err != nil {
 		writeErr(w, err)
 		return

@@ -36,7 +36,12 @@ type AsOf struct {
 
 // History returns the ordered event stream for a record.
 // Returns NotFound if the record has no events.
-func (s *Service) History(ctx context.Context, ws, col, id uuid.UUID) ([]HistoryEntry, error) {
+func (s *Service) History(ctx context.Context, ws, col, id uuid.UUID, actor string) ([]HistoryEntry, error) {
+	if _, err := s.authorize(ctx, policy.Request{
+		Workspace: ws, Actor: actor, Collection: col, Target: id, Operation: policy.OpRead,
+	}); err != nil {
+		return nil, err
+	}
 	rows, err := s.q.ListRecordEvents(ctx, db.ListRecordEventsParams{
 		WorkspaceID: ws, CollectionID: col, RecordID: id,
 	})
@@ -63,7 +68,12 @@ func (s *Service) History(ctx context.Context, ws, col, id uuid.UUID) ([]History
 }
 
 // GetAsOf resolves the record's state at the requested point in time.
-func (s *Service) GetAsOf(ctx context.Context, ws, col, id uuid.UUID, at AsOf) (Record, error) {
+func (s *Service) GetAsOf(ctx context.Context, ws, col, id uuid.UUID, at AsOf, actor string) (Record, error) {
+	if _, err := s.authorize(ctx, policy.Request{
+		Workspace: ws, Actor: actor, Collection: col, Target: id, Operation: policy.OpRead,
+	}); err != nil {
+		return Record{}, err
+	}
 	state, rev, status, err := s.resolveAsOf(ctx, s.q, ws, col, id, at)
 	if err != nil {
 		return Record{}, err

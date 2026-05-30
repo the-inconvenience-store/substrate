@@ -45,7 +45,7 @@ func seedList(t *testing.T) (*record.Service, uuid.UUID, uuid.UUID) {
 func TestList_FilterEq(t *testing.T) {
 	svc, ws, col := seedList(t)
 	q, _ := query.Parse([]string{"status:eq:open"}, "", "", "")
-	items, _, err := svc.List(context.Background(), ws, col, q)
+	items, _, err := svc.List(context.Background(), ws, col, "tester", q)
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -57,7 +57,7 @@ func TestList_FilterEq(t *testing.T) {
 func TestList_RangeNumeric(t *testing.T) {
 	svc, ws, col := seedList(t)
 	q, _ := query.Parse([]string{"age:gte:30"}, "", "", "")
-	items, _, err := svc.List(context.Background(), ws, col, q)
+	items, _, err := svc.List(context.Background(), ws, col, "tester", q)
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestList_RangeNumeric(t *testing.T) {
 func TestList_Pagination(t *testing.T) {
 	svc, ws, col := seedList(t)
 	q, _ := query.Parse(nil, "-created_at", "2", "")
-	page1, cur, err := svc.List(context.Background(), ws, col, q)
+	page1, cur, err := svc.List(context.Background(), ws, col, "tester", q)
 	if err != nil {
 		t.Fatalf("page1: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestList_Pagination(t *testing.T) {
 		t.Fatalf("page1 len=%d cursor=%q, want 2 + cursor", len(page1), cur)
 	}
 	q2, _ := query.Parse(nil, "-created_at", "2", cur)
-	page2, cur2, err := svc.List(context.Background(), ws, col, q2)
+	page2, cur2, err := svc.List(context.Background(), ws, col, "tester", q2)
 	if err != nil {
 		t.Fatalf("page2: %v", err)
 	}

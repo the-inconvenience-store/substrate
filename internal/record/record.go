@@ -165,7 +165,12 @@ func (s *Service) Create(ctx context.Context, cmd CreateCmd) (Record, error) {
 	return rec, nil
 }
 
-func (s *Service) Get(ctx context.Context, ws, col, id uuid.UUID) (Record, error) {
+func (s *Service) Get(ctx context.Context, ws, col, id uuid.UUID, actor string) (Record, error) {
+	if _, err := s.authorize(ctx, policy.Request{
+		Workspace: ws, Actor: actor, Collection: col, Target: id, Operation: policy.OpRead,
+	}); err != nil {
+		return Record{}, err
+	}
 	row, err := s.q.GetActiveRecord(ctx, db.GetActiveRecordParams{
 		WorkspaceID: ws, CollectionID: col, ID: id,
 	})
@@ -187,7 +192,12 @@ func (s *Service) Get(ctx context.Context, ws, col, id uuid.UUID) (Record, error
 
 // List runs a parsed list query within a workspace+collection and returns the
 // page of records plus an opaque next_cursor ("" when the page is the last one).
-func (s *Service) List(ctx context.Context, ws, col uuid.UUID, q query.ListQuery) ([]Record, string, error) {
+func (s *Service) List(ctx context.Context, ws, col uuid.UUID, actor string, q query.ListQuery) ([]Record, string, error) {
+	if _, err := s.authorize(ctx, policy.Request{
+		Workspace: ws, Actor: actor, Collection: col, Target: uuid.Nil, Operation: policy.OpRead,
+	}); err != nil {
+		return nil, "", err
+	}
 	sqlText, valueArgs, err := query.Build(q)
 	if err != nil {
 		return nil, "", err
