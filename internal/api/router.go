@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 
+	"github.com/substrate/substrate/internal/audit"
 	"github.com/substrate/substrate/internal/auth"
 	"github.com/substrate/substrate/internal/collection"
 	"github.com/substrate/substrate/internal/httpx"
@@ -19,6 +20,7 @@ type Deps struct {
 	Records     *record.Service
 	Schemas     *schema.Service
 	Policies    *policy.Service
+	Audit       *audit.Service
 	AdminToken  string
 }
 
@@ -58,6 +60,9 @@ func NewRouter(d Deps) http.Handler {
 	api.HandleFunc("POST /v1/policies", ph.create)
 	api.HandleFunc("GET /v1/policies", ph.list)
 	api.HandleFunc("DELETE /v1/policies/{id}", ph.delete)
+
+	aud := &auditHandlers{h: h, audit: d.Audit}
+	api.HandleFunc("GET /v1/audit", aud.list)
 
 	protected := auth.Middleware(d.Workspaces)(api)
 	mux.Handle("/v1/", protected)

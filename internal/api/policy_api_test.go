@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/substrate/substrate/internal/audit"
 	"github.com/substrate/substrate/internal/collection"
 	"github.com/substrate/substrate/internal/policy"
 	"github.com/substrate/substrate/internal/record"
@@ -38,6 +39,7 @@ func newGovServer(t *testing.T) (*httptest.Server, string, string, uuid.UUID, *p
 		Collections: collection.New(pool),
 		Records:     record.New(pool, nil).WithEvaluator(engine),
 		Policies:    policy.NewService(pool),
+		Audit:       audit.New(pool),
 		AdminToken:  adminToken,
 	}))
 	t.Cleanup(srv.Close)
