@@ -13,8 +13,8 @@ import (
 )
 
 const appendEvent = `-- name: AppendEvent :exec
-INSERT INTO events (id, workspace_id, collection_id, record_id, type, revision, state_after, actor, idempotency_key, trace)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+INSERT INTO events (id, workspace_id, collection_id, record_id, type, revision, state_after, actor, idempotency_key, trace, schema_version)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 `
 
 type AppendEventParams struct {
@@ -28,6 +28,7 @@ type AppendEventParams struct {
 	Actor          pgtype.Text `json:"actor"`
 	IdempotencyKey pgtype.Text `json:"idempotency_key"`
 	Trace          []byte      `json:"trace"`
+	SchemaVersion  pgtype.Int4 `json:"schema_version"`
 }
 
 func (q *Queries) AppendEvent(ctx context.Context, arg AppendEventParams) error {
@@ -42,8 +43,44 @@ func (q *Queries) AppendEvent(ctx context.Context, arg AppendEventParams) error 
 		arg.Actor,
 		arg.IdempotencyKey,
 		arg.Trace,
+		arg.SchemaVersion,
 	)
 	return err
+}
+
+const getLatestRecordEvent = `-- name: GetLatestRecordEvent :one
+SELECT state_after, revision, type, actor, schema_version
+FROM events
+WHERE workspace_id = $1 AND collection_id = $2 AND record_id = $3 AND type <> 'policy_denied'
+ORDER BY seq DESC
+LIMIT 1
+`
+
+type GetLatestRecordEventParams struct {
+	WorkspaceID  uuid.UUID `json:"workspace_id"`
+	CollectionID uuid.UUID `json:"collection_id"`
+	RecordID     uuid.UUID `json:"record_id"`
+}
+
+type GetLatestRecordEventRow struct {
+	StateAfter    []byte      `json:"state_after"`
+	Revision      int64       `json:"revision"`
+	Type          string      `json:"type"`
+	Actor         pgtype.Text `json:"actor"`
+	SchemaVersion pgtype.Int4 `json:"schema_version"`
+}
+
+func (q *Queries) GetLatestRecordEvent(ctx context.Context, arg GetLatestRecordEventParams) (GetLatestRecordEventRow, error) {
+	row := q.db.QueryRow(ctx, getLatestRecordEvent, arg.WorkspaceID, arg.CollectionID, arg.RecordID)
+	var i GetLatestRecordEventRow
+	err := row.Scan(
+		&i.StateAfter,
+		&i.Revision,
+		&i.Type,
+		&i.Actor,
+		&i.SchemaVersion,
+	)
+	return i, err
 }
 
 const getReplayEvent = `-- name: GetReplayEvent :one

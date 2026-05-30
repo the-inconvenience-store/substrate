@@ -1,6 +1,13 @@
 -- name: AppendEvent :exec
-INSERT INTO events (id, workspace_id, collection_id, record_id, type, revision, state_after, actor, idempotency_key, trace)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+INSERT INTO events (id, workspace_id, collection_id, record_id, type, revision, state_after, actor, idempotency_key, trace, schema_version)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);
+
+-- name: GetLatestRecordEvent :one
+SELECT state_after, revision, type, actor, schema_version
+FROM events
+WHERE workspace_id = $1 AND collection_id = $2 AND record_id = $3 AND type <> 'policy_denied'
+ORDER BY seq DESC
+LIMIT 1;
 
 -- name: GetReplayEvent :one
 SELECT record_id, collection_id, revision, state_after, actor, type

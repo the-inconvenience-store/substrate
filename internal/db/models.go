@@ -26,6 +26,7 @@ type Collection struct {
 	ActiveSchemaVersion pgtype.Int4        `json:"active_schema_version"`
 	CreatedAt           pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	AutoBackfill        bool               `json:"auto_backfill"`
 }
 
 type Event struct {
@@ -41,6 +42,7 @@ type Event struct {
 	Trace          []byte             `json:"trace"`
 	IdempotencyKey pgtype.Text        `json:"idempotency_key"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	SchemaVersion  pgtype.Int4        `json:"schema_version"`
 }
 
 type Policy struct {
