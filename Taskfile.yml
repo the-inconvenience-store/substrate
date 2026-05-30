@@ -1,0 +1,33 @@
+version: '3'
+
+tasks:
+  build:
+    desc: Build all packages
+    cmds:
+      - go build ./...
+
+  test:
+    desc: Run unit tests
+    cmds:
+      - go test ./...
+
+  test:integration:
+    desc: Run integration tests (requires Docker)
+    cmds:
+      - go test -tags=integration ./...
+
+  test:all:
+    desc: Run unit and integration tests
+    cmds:
+      - task: test
+      - task: test:integration
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet ./...
+
+  run:
+    desc: Run the server
+    cmds:
+      - go run ./cmd/substrate

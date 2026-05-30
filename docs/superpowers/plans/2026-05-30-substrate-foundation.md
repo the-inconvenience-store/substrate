@@ -27,7 +27,7 @@
 ```
 go.mod
 go.sum
-Makefile
+Taskfile.yml
 cmd/substrate/main.go              # bootstrap: config, DB open, migrate, HTTP server
 internal/config/config.go          # flags + env config
 internal/store/store.go            # pgxpool open + WithTx transaction helper
@@ -52,7 +52,7 @@ Tests live next to the code as `*_test.go`.
 ## Task 0: Project scaffold and a passing health check
 
 **Files:**
-- Create: `go.mod`, `Makefile`, `cmd/substrate/main.go`, `internal/api/router.go`, `internal/httpx/respond.go`
+- Create: `go.mod`, `Taskfile.yml`, `cmd/substrate/main.go`, `internal/api/router.go`, `internal/httpx/respond.go`
 - Test: `internal/api/router_test.go`
 
 - [ ] **Step 1: Initialize the module and tidy tooling**
@@ -151,7 +151,7 @@ func NewRouter(d Deps) http.Handler {
 Run: `go test ./internal/api/...`
 Expected: PASS.
 
-- [ ] **Step 7: Add a minimal main and Makefile**
+- [ ] **Step 7: Add a minimal main and Taskfile**
 
 Create `cmd/substrate/main.go`:
 ```go
@@ -176,23 +176,44 @@ func main() {
 }
 ```
 
-Create `Makefile`:
-```make
-.PHONY: build test run
-build:
-	go build ./...
-test:
-	go test ./...
-run:
-	go run ./cmd/substrate
+Create `Taskfile.yml` (this project uses [Task](https://taskfile.dev), not Make):
+```yaml
+version: '3'
+
+tasks:
+  build:
+    desc: Build all packages
+    cmds:
+      - go build ./...
+  test:
+    desc: Run unit tests
+    cmds:
+      - go test ./...
+  test:integration:
+    desc: Run integration tests (requires Docker)
+    cmds:
+      - go test -tags=integration ./...
+  test:all:
+    desc: Run unit and integration tests
+    cmds:
+      - task: test
+      - task: test:integration
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet ./...
+  run:
+    desc: Run the server
+    cmds:
+      - go run ./cmd/substrate
 ```
 
 - [ ] **Step 8: Verify build and commit**
 
-Run: `make build && go test ./...`
+Run: `task build && go test ./...`
 Expected: builds; the health test passes.
 ```bash
-git add go.mod go.sum Makefile cmd internal
+git add go.mod go.sum Taskfile.yml cmd internal
 git commit -m "feat: scaffold module, router, and health check"
 ```
 
@@ -2764,7 +2785,7 @@ git commit -m "feat: admin bootstrap endpoints for workspaces and api keys"
 
 - [ ] **Step 1: Write the quickstart**
 
-Create `README.md` documenting: prerequisites (Go 1.26, Docker for integration tests), `make build`, running with `--embedded` vs `--database-url`, the admin bootstrap flow, and a `curl` walkthrough of create-collection → create-record → update (If-Match) → history → revert. Include the test commands:
+Create `README.md` documenting: prerequisites (Go 1.26, [Task](https://taskfile.dev), Docker for integration tests), `task build`, running with `--embedded` vs `--database-url`, the admin bootstrap flow, and a `curl` walkthrough of create-collection → create-record → update (If-Match) → history → revert. Include the test commands (and note the `task test` / `task test:integration` equivalents):
 ```bash
 go test ./...                      # unit tests
 go test -tags=integration ./...    # integration tests (needs Docker)
