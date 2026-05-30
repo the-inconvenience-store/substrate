@@ -126,3 +126,32 @@ func TestClassify_AmbiguousConstruct_Breaking(t *testing.T) {
 		t.Fatal("switching to an unanalyzable construct must be conservatively breaking")
 	}
 }
+
+func TestClassify_AddTypeConstraintWhereNone_Breaking(t *testing.T) {
+	// Existing field had no type (any value allowed); candidate constrains it to string.
+	// Pre-existing non-string data would now fail -> breaking.
+	cur := obj(map[string]any{"a": map[string]any{}}, "a")
+	cand := obj(map[string]any{"a": map[string]any{"type": "string"}}, "a")
+	if !hasBreaking(Classify(cur, cand)) {
+		t.Fatal("introducing a type constraint on a previously-unconstrained field must be breaking")
+	}
+}
+
+func TestClassify_AddEnumConstraintWhereNone_Breaking(t *testing.T) {
+	// Existing field had no enum; candidate restricts it to {x}. Pre-existing values
+	// other than "x" would now fail -> breaking.
+	cur := obj(map[string]any{"a": map[string]any{"type": "string"}}, "a")
+	cand := obj(map[string]any{"a": map[string]any{"type": "string", "enum": []any{"x"}}}, "a")
+	if !hasBreaking(Classify(cur, cand)) {
+		t.Fatal("introducing an enum constraint on a previously-unconstrained field must be breaking")
+	}
+}
+
+func TestClassify_RemoveTypeConstraint_NotBreaking(t *testing.T) {
+	// Relaxing: candidate drops the type constraint entirely -> non-breaking.
+	cur := obj(map[string]any{"a": map[string]any{"type": "string"}}, "a")
+	cand := obj(map[string]any{"a": map[string]any{}}, "a")
+	if hasBreaking(Classify(cur, cand)) {
+		t.Fatal("removing a type constraint must not be breaking")
+	}
+}

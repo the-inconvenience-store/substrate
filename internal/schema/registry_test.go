@@ -4,6 +4,7 @@ package schema
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/google/uuid"
@@ -12,6 +13,52 @@ import (
 	"github.com/substrate/substrate/internal/store"
 	"github.com/substrate/substrate/internal/workspace"
 )
+
+// TestRegisterConcurrentVersionAllocation fires many concurrent Register calls at the
+// same collection and asserts every one succeeds with a distinct, gap-free version
+// 1..N. This exercises the FOR UPDATE lock in version allocation: without it,
+// concurrent registers would race on NextSchemaVersion and collide on the
+// UNIQUE(collection_id, version) constraint.
+func TestRegisterConcurrentVersionAllocation(t *testing.T) {
+	svc, ws, col := setup(t)
+	ctx := context.Background()
+
+	const n = 8
+	var wg sync.WaitGroup
+	versions := make([]int, n)
+	errs := make([]error, n)
+	wg.Add(n)
+	for i := 0; i < n; i++ {
+		go func(i int) {
+			defer wg.Done()
+			reg, err := svc.Register(ctx, RegisterCmd{
+				Workspace: ws, Collection: col, JSONSchema: personSchema(),
+			})
+			errs[i] = err
+			if err == nil {
+				versions[i] = reg.Version
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	seen := map[int]bool{}
+	for i := 0; i < n; i++ {
+		if errs[i] != nil {
+			t.Fatalf("register %d failed: %v", i, errs[i])
+		}
+		if versions[i] < 1 || versions[i] > n {
+			t.Fatalf("version %d out of range: %d", i, versions[i])
+		}
+		if seen[versions[i]] {
+			t.Fatalf("duplicate version allocated: %d", versions[i])
+		}
+		seen[versions[i]] = true
+	}
+	if len(seen) != n {
+		t.Fatalf("expected %d distinct versions 1..%d, got %d", n, n, len(seen))
+	}
+}
 
 func setup(t *testing.T) (*Service, uuid.UUID, uuid.UUID) {
 	t.Helper()

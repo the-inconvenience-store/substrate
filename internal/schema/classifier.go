@@ -46,7 +46,14 @@ func classifyNode(cur, cand map[string]any, path string, out *[]Change) {
 }
 
 func classifyType(cur, cand any, path string, out *[]Change) {
-	if cur == nil || cand == nil || equalJSON(cur, cand) {
+	if equalJSON(cur, cand) || cand == nil {
+		// No change, or the type constraint was removed (relaxation) -> not breaking.
+		return
+	}
+	if cur == nil {
+		// Introducing a type constraint where none existed restricts previously-valid
+		// data -> breaking (conservative).
+		*out = append(*out, Change{Path: path + ".type", Kind: "add-type-constraint", Breaking: true})
 		return
 	}
 	curSet := typeSet(cur)
@@ -63,7 +70,12 @@ func classifyType(cur, cand any, path string, out *[]Change) {
 
 func classifyEnum(cur, cand any, path string, out *[]Change) {
 	if cur == nil {
-		return // no prior constraint -> candidate adding enum is a tighten only if cur unconstrained
+		// Introducing an enum constraint where none existed restricts previously-valid
+		// data to the new set -> breaking (conservative).
+		if _, ok := cand.([]any); ok {
+			*out = append(*out, Change{Path: path + ".enum", Kind: "add-enum-constraint", Breaking: true})
+		}
+		return
 	}
 	curVals, ok1 := cur.([]any)
 	candVals, ok2 := cand.([]any)
