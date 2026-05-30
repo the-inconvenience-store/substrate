@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/substrate/substrate/internal/auth"
 	"github.com/substrate/substrate/internal/collection"
 	"github.com/substrate/substrate/internal/httpx"
+	"github.com/substrate/substrate/internal/jsonx"
 	"github.com/substrate/substrate/internal/projection"
 	"github.com/substrate/substrate/internal/query"
 	"github.com/substrate/substrate/internal/record"
@@ -47,7 +47,7 @@ func (h *handlers) createCollection(w http.ResponseWriter, r *http.Request) {
 		Level        string `json:"level"`
 		AutoBackfill bool   `json:"auto_backfill"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := jsonx.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, apierr.New(apierr.BadRequest, "invalid json"))
 		return
 	}
@@ -77,7 +77,7 @@ func (h *handlers) createRecord(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Data map[string]any `json:"data"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := jsonx.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, apierr.New(apierr.BadRequest, "invalid json"))
 		return
 	}
@@ -169,7 +169,7 @@ func (h *handlers) updateRecord(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Data map[string]any `json:"data"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := jsonx.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, apierr.New(apierr.BadRequest, "invalid json"))
 		return
 	}
@@ -237,7 +237,7 @@ func (h *handlers) revertRecord(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		To string `json:"to"`
 	}
-	_ = json.NewDecoder(r.Body).Decode(&body)
+	_ = jsonx.NewDecoder(r.Body).Decode(&body)
 	at, perr := parseAsOf(body.To)
 	if perr != nil {
 		writeErr(w, perr)
@@ -310,7 +310,7 @@ func (a *adminHandlers) createWorkspace(w http.ResponseWriter, r *http.Request) 
 	var body struct {
 		Name string `json:"name"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := jsonx.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, apierr.New(apierr.BadRequest, "invalid json"))
 		return
 	}
@@ -335,7 +335,7 @@ func (a *adminHandlers) createKey(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Label string `json:"label"`
 	}
-	_ = json.NewDecoder(r.Body).Decode(&body)
+	_ = jsonx.NewDecoder(r.Body).Decode(&body)
 	plaintext, id, err := a.workspaces.CreateAPIKey(r.Context(), wsID, body.Label)
 	if err != nil {
 		writeErr(w, err)

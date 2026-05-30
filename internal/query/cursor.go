@@ -2,7 +2,8 @@ package query
 
 import (
 	"encoding/base64"
-	"encoding/json"
+
+	"github.com/substrate/substrate/internal/jsonx"
 )
 
 // cursorData is the decoded payload of an opaque keyset cursor.
@@ -13,7 +14,7 @@ type cursorData struct {
 }
 
 func encodeCursor(c cursorData) string {
-	b, _ := json.Marshal(c)
+	b, _ := jsonx.Marshal(c)
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 
@@ -23,7 +24,7 @@ func decodeCursor(tok string) (cursorData, error) {
 		return cursorData{}, badRequest("invalid cursor encoding")
 	}
 	var c cursorData
-	if err := json.Unmarshal(raw, &c); err != nil {
+	if err := jsonx.Unmarshal(raw, &c); err != nil {
 		return cursorData{}, badRequest("invalid cursor payload")
 	}
 	return c, nil

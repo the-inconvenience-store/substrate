@@ -3,7 +3,6 @@ package projection
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -15,6 +14,7 @@ import (
 
 	"github.com/substrate/substrate/internal/apierr"
 	"github.com/substrate/substrate/internal/db"
+	"github.com/substrate/substrate/internal/jsonx"
 	"github.com/substrate/substrate/internal/schema"
 	"github.com/substrate/substrate/internal/store"
 )
@@ -60,6 +60,7 @@ func (b *Backfiller) Run(ctx context.Context, ws, col uuid.UUID, batch int) (Rep
 	if err != nil {
 		return rep, err
 	}
+	dflts := parseDefaults(active.Raw) // parse the schema's defaults once for the whole run
 	if batch <= 0 || batch > defaultBatch {
 		batch = defaultBatch
 	}
@@ -78,7 +79,7 @@ func (b *Backfiller) Run(ctx context.Context, ws, col uuid.UUID, batch int) (Rep
 		}
 		for _, row := range rows {
 			rep.Scanned++
-			migrated, err := b.migrateOne(ctx, ws, col, row.ID, int32(active.Version), active.Raw, compiled)
+			migrated, err := b.migrateOne(ctx, ws, col, row.ID, int32(active.Version), dflts, compiled)
 			if err != nil {
 				return rep, err
 			}
@@ -104,7 +105,7 @@ func (b *Backfiller) Run(ctx context.Context, ws, col uuid.UUID, batch int) (Rep
 	return rep, nil
 }
 
-func (b *Backfiller) migrateOne(ctx context.Context, ws, col, id uuid.UUID, activeVer int32, schemaRaw []byte, compiled *jsonschema.Schema) (bool, error) {
+func (b *Backfiller) migrateOne(ctx context.Context, ws, col, id uuid.UUID, activeVer int32, dflts schemaDefaults, compiled *jsonschema.Schema) (bool, error) {
 	var migrated bool
 	err := store.WithTx(ctx, b.pool, func(tx pgx.Tx) error {
 		qtx := b.q.WithTx(tx)
@@ -119,18 +120,18 @@ func (b *Backfiller) migrateOne(ctx context.Context, ws, col, id uuid.UUID, acti
 			return nil // advanced by a concurrent write
 		}
 		var data map[string]any
-		if err := json.Unmarshal(row.Data, &data); err != nil {
+		if err := jsonx.Unmarshal(row.Data, &data); err != nil {
 			return fmt.Errorf("decode data: %w", err)
 		}
 		if data == nil {
 			data = map[string]any{}
 		}
-		migratedData, _ := applyDefaults(schemaRaw, data)
+		migratedData, _ := dflts.apply(data)
 		if err := compiled.Validate(migratedData); err != nil {
 			return nil // invalid under active schema: skip, leave untouched
 		}
 		next := row.Revision + 1
-		raw, err := json.Marshal(migratedData)
+		raw, err := jsonx.Marshal(migratedData)
 		if err != nil {
 			return fmt.Errorf("encode migrated: %w", err)
 		}

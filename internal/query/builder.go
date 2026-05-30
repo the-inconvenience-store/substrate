@@ -1,7 +1,6 @@
 package query
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 )
@@ -58,10 +57,13 @@ func normalizeSort(keys []SortKey) string {
 // value args follow in $3.. order.
 func Build(q ListQuery) (string, []any, error) {
 	var b strings.Builder
-	args := []any{}            // value args, starting logically at $3
-	ph := func(v any) string { // append an arg, return its placeholder
+	args := make([]any, 0, len(q.Filters)+2) // value args, starting logically at $3
+	// writePH appends an arg and writes its placeholder ($N) directly to b,
+	// avoiding the intermediate string a "$"+itoa concatenation would allocate.
+	writePH := func(v any) {
 		args = append(args, v)
-		return "$" + strconv.Itoa(len(args)+2)
+		b.WriteByte('$')
+		b.WriteString(strconv.Itoa(len(args) + 2))
 	}
 
 	sortField := q.Sort[0].Field
@@ -82,22 +84,47 @@ func Build(q ListQuery) (string, []any, error) {
 		expr := colExpr(f.Field)
 		switch f.Op {
 		case "eq":
-			b.WriteString("\n  AND " + expr + " = " + ph(f.Value))
+			b.WriteString("\n  AND ")
+			b.WriteString(expr)
+			b.WriteString(" = ")
+			writePH(f.Value)
 		case "neq":
-			b.WriteString("\n  AND " + expr + " IS DISTINCT FROM " + ph(f.Value))
+			b.WriteString("\n  AND ")
+			b.WriteString(expr)
+			b.WriteString(" IS DISTINCT FROM ")
+			writePH(f.Value)
 		case "in":
-			b.WriteString("\n  AND " + expr + " = ANY(" + ph(f.List) + ")")
+			b.WriteString("\n  AND ")
+			b.WriteString(expr)
+			b.WriteString(" = ANY(")
+			writePH(f.List)
+			b.WriteByte(')')
 		case "exists":
 			if isSystemCol(f.Field) {
 				return "", nil, badRequest("exists is not supported on system fields")
 			}
-			b.WriteString("\n  AND (data ? '" + f.Field + "') = " + ph(f.Value == "true"))
+			b.WriteString("\n  AND (data ? '")
+			b.WriteString(f.Field)
+			b.WriteString("') = ")
+			writePH(f.Value == "true")
 		default: // range
 			op := rangeOps[f.Op]
 			if isSystemCol(f.Field) {
-				b.WriteString("\n  AND " + expr + " " + op + " " + ph(f.Value) + "::" + colType(f.Field))
+				b.WriteString("\n  AND ")
+				b.WriteString(expr)
+				b.WriteByte(' ')
+				b.WriteString(op)
+				b.WriteByte(' ')
+				writePH(f.Value)
+				b.WriteString("::")
+				b.WriteString(colType(f.Field))
 			} else {
-				b.WriteString("\n  AND " + inferCast(expr, f.Value) + " " + op + " " + ph(f.Value))
+				b.WriteString("\n  AND ")
+				b.WriteString(inferCast(expr, f.Value))
+				b.WriteByte(' ')
+				b.WriteString(op)
+				b.WriteByte(' ')
+				writePH(f.Value)
 			}
 		}
 	}
@@ -110,14 +137,27 @@ func Build(q ListQuery) (string, []any, error) {
 		if c.Sort != normalizeSort(q.Sort) {
 			return "", nil, badRequest("cursor does not match sort")
 		}
-		valPH := ph(c.Value)
-		idPH := ph(c.ID)
-		b.WriteString(fmt.Sprintf("\n  AND (%s, id) %s (%s::%s, %s::uuid)",
-			sortExpr, cmp, valPH, colType(sortField), idPH))
+		b.WriteString("\n  AND (")
+		b.WriteString(sortExpr)
+		b.WriteString(", id) ")
+		b.WriteString(cmp)
+		b.WriteString(" (")
+		writePH(c.Value)
+		b.WriteString("::")
+		b.WriteString(colType(sortField))
+		b.WriteString(", ")
+		writePH(c.ID)
+		b.WriteString("::uuid)")
 	}
 
-	b.WriteString(fmt.Sprintf("\nORDER BY %s %s, id %s", sortExpr, dir, dir))
-	b.WriteString(fmt.Sprintf("\nLIMIT %d", q.Limit+1))
+	b.WriteString("\nORDER BY ")
+	b.WriteString(sortExpr)
+	b.WriteByte(' ')
+	b.WriteString(dir)
+	b.WriteString(", id ")
+	b.WriteString(dir)
+	b.WriteString("\nLIMIT ")
+	b.WriteString(strconv.Itoa(q.Limit + 1))
 
 	return b.String(), args, nil
 }

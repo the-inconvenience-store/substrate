@@ -1,13 +1,13 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 
 	"github.com/substrate/substrate/internal/apierr"
 	"github.com/substrate/substrate/internal/auth"
 	"github.com/substrate/substrate/internal/httpx"
+	"github.com/substrate/substrate/internal/jsonx"
 	"github.com/substrate/substrate/internal/schema"
 )
 
@@ -29,7 +29,7 @@ func (sh *schemaHandlers) register(w http.ResponseWriter, r *http.Request) {
 		Force         bool           `json:"force"`
 		Rationale     string         `json:"rationale"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := jsonx.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, apierr.New(apierr.BadRequest, "invalid json"))
 		return
 	}
@@ -93,7 +93,7 @@ func (sh *schemaHandlers) activate(w http.ResponseWriter, r *http.Request) {
 		Force     bool   `json:"force"`
 		Rationale string `json:"rationale"`
 	}
-	_ = json.NewDecoder(r.Body).Decode(&body)
+	_ = jsonx.NewDecoder(r.Body).Decode(&body)
 	if err := sh.schemas.Activate(r.Context(), c.WorkspaceID, c.ID, ver, auth.ActorFrom(r.Context()), body.Force, body.Rationale); err != nil {
 		writeErr(w, err)
 		return
