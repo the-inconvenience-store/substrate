@@ -16,6 +16,9 @@ const (
 	Forbidden    Code = "policy_denied"
 	BadRequest   Code = "bad_request"
 	Internal     Code = "internal"
+
+	SchemaInvalid      Code = "schema_invalid"
+	SchemaIncompatible Code = "schema_incompatible"
 )
 
 // Error is a typed service error carrying an API code and optional details.
@@ -46,6 +49,10 @@ func (e *Error) HTTPStatus() int {
 		return http.StatusForbidden
 	case BadRequest:
 		return http.StatusBadRequest
+	case SchemaInvalid:
+		return http.StatusUnprocessableEntity
+	case SchemaIncompatible:
+		return http.StatusConflict
 	default:
 		return http.StatusInternalServerError
 	}
