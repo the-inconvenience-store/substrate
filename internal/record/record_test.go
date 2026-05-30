@@ -29,7 +29,7 @@ func setup(t *testing.T) (*Service, uuid.UUID, uuid.UUID) {
 	if err != nil {
 		t.Fatalf("collection: %v", err)
 	}
-	return New(pool), ws.ID, c.ID
+	return New(pool, nil), ws.ID, c.ID
 }
 
 func TestCreateAndGet(t *testing.T) {
@@ -291,7 +291,7 @@ func TestIdempotentConflictSentinelReplay(t *testing.T) {
 	if err != nil {
 		t.Fatalf("collection: %v", err)
 	}
-	svc := New(pool)
+	svc := New(pool, nil)
 
 	// First Create establishes the winning event row.
 	key := "sentinel-key-" + uuid.New().String()

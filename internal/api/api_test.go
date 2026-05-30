@@ -30,7 +30,7 @@ func newTestServer(t *testing.T) (*httptest.Server, string) {
 	srv := httptest.NewServer(NewRouter(Deps{
 		Workspaces:  ws,
 		Collections: collection.New(pool),
-		Records:     record.New(pool),
+		Records:     record.New(pool, nil),
 	}))
 	t.Cleanup(srv.Close)
 	return srv, key

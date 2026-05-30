@@ -12,6 +12,7 @@ import (
 	"github.com/substrate/substrate/internal/collection"
 	"github.com/substrate/substrate/internal/config"
 	"github.com/substrate/substrate/internal/record"
+	"github.com/substrate/substrate/internal/schema"
 	"github.com/substrate/substrate/internal/store"
 	"github.com/substrate/substrate/internal/workspace"
 )
@@ -49,10 +50,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	schemaReg := schema.New(pool)
 	router := api.NewRouter(api.Deps{
 		Workspaces:  workspace.New(pool),
 		Collections: collection.New(pool),
-		Records:     record.New(pool),
+		Records:     record.New(pool, schema.NewValidator(schemaReg)),
+		Schemas:     schemaReg,
 		AdminToken:  cfg.AdminToken,
 	})
 

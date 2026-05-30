@@ -47,13 +47,39 @@ type UpdateCmd struct {
 	IdempotencyKey   string
 }
 
-// Service performs record mutations and reads.
-type Service struct {
-	pool *pgxpool.Pool
-	q    *db.Queries
+// Validator validates a record body against a collection's active schema and
+// returns the schema version to stamp (0 for flexible collections).
+type Validator interface {
+	ValidateWrite(ctx context.Context, collectionID uuid.UUID, data map[string]any) (int, error)
 }
 
-func New(pool *pgxpool.Pool) *Service { return &Service{pool: pool, q: db.New(pool)} }
+// Service performs record mutations and reads.
+type Service struct {
+	pool      *pgxpool.Pool
+	q         *db.Queries
+	validator Validator
+}
+
+// New builds a record service. validator may be nil (flexible-only; no validation).
+func New(pool *pgxpool.Pool, validator Validator) *Service {
+	return &Service{pool: pool, q: db.New(pool), validator: validator}
+}
+
+// schemaVersionParam validates (if a validator is configured) and returns the
+// pgtype.Int4 to stamp on the record. version 0 -> NULL (flexible / grandfathered).
+func (s *Service) schemaVersionParam(ctx context.Context, col uuid.UUID, data map[string]any) (pgtype.Int4, error) {
+	if s.validator == nil {
+		return pgtype.Int4{}, nil
+	}
+	ver, err := s.validator.ValidateWrite(ctx, col, data)
+	if err != nil {
+		return pgtype.Int4{}, err
+	}
+	if ver == 0 {
+		return pgtype.Int4{}, nil
+	}
+	return pgtype.Int4{Int32: int32(ver), Valid: true}, nil
+}
 
 func (s *Service) Create(ctx context.Context, cmd CreateCmd) (Record, error) {
 	rec := Record{
@@ -63,7 +89,11 @@ func (s *Service) Create(ctx context.Context, cmd CreateCmd) (Record, error) {
 	if rec.Data == nil {
 		rec.Data = map[string]any{}
 	}
-	err := store.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
+	sv, err := s.schemaVersionParam(ctx, cmd.Collection, rec.Data)
+	if err != nil {
+		return Record{}, err
+	}
+	err = store.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
 		qtx := s.q.WithTx(tx)
 		if cmd.IdempotencyKey != "" {
 			if replayed, ok, err := lookupReplay(ctx, qtx, cmd.Workspace, cmd.IdempotencyKey); err != nil {
@@ -83,6 +113,7 @@ func (s *Service) Create(ctx context.Context, cmd CreateCmd) (Record, error) {
 		return qtx.InsertRecord(ctx, db.InsertRecordParams{
 			ID: rec.ID, CollectionID: cmd.Collection, WorkspaceID: cmd.Workspace,
 			Data: mustJSON(rec.Data), Revision: 1, Actor: textOrNull(cmd.Actor),
+			SchemaVersion: sv,
 		})
 	})
 	if err != nil {
@@ -151,6 +182,10 @@ func (s *Service) Update(ctx context.Context, cmd UpdateCmd) (Record, error) {
 		if cmd.Data == nil {
 			cmd.Data = map[string]any{}
 		}
+		sv, verr := s.schemaVersionParam(ctx, cmd.Collection, cmd.Data)
+		if verr != nil {
+			return verr
+		}
 		if err := appendEvent(ctx, qtx, eventRow{
 			Workspace: cmd.Workspace, Collection: cmd.Collection, RecordID: cmd.ID,
 			Type: "update", Revision: next, State: cmd.Data, Actor: cmd.Actor,
@@ -161,6 +196,7 @@ func (s *Service) Update(ctx context.Context, cmd UpdateCmd) (Record, error) {
 		if err := qtx.UpdateRecordData(ctx, db.UpdateRecordDataParams{
 			WorkspaceID: cmd.Workspace, CollectionID: cmd.Collection, ID: cmd.ID,
 			Data: mustJSON(cmd.Data), Revision: next, Actor: textOrNull(cmd.Actor),
+			SchemaVersion: sv,
 		}); err != nil {
 			return err
 		}

@@ -56,6 +56,19 @@ type Record struct {
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
 
+type Schema struct {
+	ID            uuid.UUID          `json:"id"`
+	CollectionID  uuid.UUID          `json:"collection_id"`
+	WorkspaceID   uuid.UUID          `json:"workspace_id"`
+	Version       int32              `json:"version"`
+	JsonSchema    []byte             `json:"json_schema"`
+	Lifecycle     string             `json:"lifecycle"`
+	IndexedFields []byte             `json:"indexed_fields"`
+	Rationale     pgtype.Text        `json:"rationale"`
+	CreatedBy     pgtype.Text        `json:"created_by"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+}
+
 type Workspace struct {
 	ID         uuid.UUID          `json:"id"`
 	Name       string             `json:"name"`
