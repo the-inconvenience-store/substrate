@@ -1,7 +1,6 @@
 package schema
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -17,12 +16,6 @@ import (
 	"github.com/substrate/substrate/internal/db"
 	"github.com/substrate/substrate/internal/store"
 )
-
-// bytesReader adapts a byte slice to the io.Reader the jsonschema API expects.
-// NOTE: This is a temporary copy kept here so Task 3 compiles without Task 5's
-// validator.go. When Task 5 lands and adds the canonical bytesReader in validator.go
-// (same package), this copy must be removed to avoid a duplicate-function error.
-func bytesReader(b []byte) *bytes.Reader { return bytes.NewReader(b) }
 
 // SchemaVersion is a registered, immutable schema version.
 type SchemaVersion struct {
