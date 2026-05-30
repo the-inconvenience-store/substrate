@@ -1,0 +1,56 @@
+goos: darwin
+goarch: amd64
+pkg: github.com/substrate/substrate/internal/api
+cpu: VirtualApple @ 2.50GHz
+BenchmarkHTTP_CreateRecord-8        	     372	   2853214 ns/op	   36862 B/op	     458 allocs/op
+BenchmarkHTTP_CreateRecord-8        	     524	   3083868 ns/op	   36811 B/op	     458 allocs/op
+BenchmarkHTTP_CreateRecord-8        	     408	   2717787 ns/op	   36862 B/op	     458 allocs/op
+BenchmarkHTTP_CreateRecord-8        	     435	   2357375 ns/op	   36853 B/op	     458 allocs/op
+BenchmarkHTTP_CreateRecord-8        	     442	   2480372 ns/op	   37524 B/op	     459 allocs/op
+BenchmarkHTTP_CreateRecord-8        	     427	   2743397 ns/op	   36650 B/op	     458 allocs/op
+BenchmarkHTTP_CreateRecord-8        	     436	   2344104 ns/op	   36850 B/op	     458 allocs/op
+BenchmarkHTTP_CreateRecord-8        	     465	   2713803 ns/op	   37061 B/op	     458 allocs/op
+BenchmarkHTTP_CreateRecord-8        	     572	   2177640 ns/op	   36880 B/op	     458 allocs/op
+BenchmarkHTTP_CreateRecord-8        	     586	   2141765 ns/op	   36617 B/op	     458 allocs/op
+BenchmarkHTTP_GetRecord-8           	    1154	   1003575 ns/op	   17745 B/op	     276 allocs/op
+BenchmarkHTTP_GetRecord-8           	    1278	   1013605 ns/op	   17936 B/op	     276 allocs/op
+BenchmarkHTTP_GetRecord-8           	    1269	   1027020 ns/op	   17262 B/op	     276 allocs/op
+BenchmarkHTTP_GetRecord-8           	    1052	   1219422 ns/op	   17448 B/op	     276 allocs/op
+BenchmarkHTTP_GetRecord-8           	    1207	   1115591 ns/op	   17925 B/op	     276 allocs/op
+BenchmarkHTTP_GetRecord-8           	    1254	   1056499 ns/op	   17224 B/op	     276 allocs/op
+BenchmarkHTTP_GetRecord-8           	    1036	   1010636 ns/op	   17285 B/op	     276 allocs/op
+BenchmarkHTTP_GetRecord-8           	    1221	   1036116 ns/op	   17787 B/op	     276 allocs/op
+BenchmarkHTTP_GetRecord-8           	    1306	   1041376 ns/op	   17742 B/op	     276 allocs/op
+BenchmarkHTTP_GetRecord-8           	    1264	   1033258 ns/op	   17297 B/op	     276 allocs/op
+BenchmarkHTTP_ListRecords_Small-8   	     531	   2586328 ns/op	  299613 B/op	    2546 allocs/op
+BenchmarkHTTP_ListRecords_Small-8   	     567	   2665150 ns/op	  300257 B/op	    2546 allocs/op
+BenchmarkHTTP_ListRecords_Small-8   	     544	   2671688 ns/op	  294418 B/op	    2545 allocs/op
+BenchmarkHTTP_ListRecords_Small-8   	     494	   2658947 ns/op	  292287 B/op	    2544 allocs/op
+BenchmarkHTTP_ListRecords_Small-8   	     500	   2451082 ns/op	  293167 B/op	    2545 allocs/op
+BenchmarkHTTP_ListRecords_Small-8   	     536	   2749939 ns/op	  297415 B/op	    2546 allocs/op
+BenchmarkHTTP_ListRecords_Small-8   	     541	   2604487 ns/op	  299671 B/op	    2546 allocs/op
+BenchmarkHTTP_ListRecords_Small-8   	     583	   3165051 ns/op	  311911 B/op	    2548 allocs/op
+BenchmarkHTTP_ListRecords_Small-8   	     597	   2503721 ns/op	  307696 B/op	    2547 allocs/op
+BenchmarkHTTP_ListRecords_Small-8   	     432	   2439196 ns/op	  305616 B/op	    2547 allocs/op
+BenchmarkHTTP_ListRecords_Large-8   	     102	  13102956 ns/op	  313994 B/op	    2548 allocs/op
+BenchmarkHTTP_ListRecords_Large-8   	      92	  13195277 ns/op	  303213 B/op	    2547 allocs/op
+BenchmarkHTTP_ListRecords_Large-8   	      91	  13241450 ns/op	  289788 B/op	    2544 allocs/op
+BenchmarkHTTP_ListRecords_Large-8   	      91	  13078087 ns/op	  312695 B/op	    2548 allocs/op
+BenchmarkHTTP_ListRecords_Large-8   	      91	  13147147 ns/op	  328111 B/op	    2551 allocs/op
+BenchmarkHTTP_ListRecords_Large-8   	      91	  12970012 ns/op	  307737 B/op	    2547 allocs/op
+BenchmarkHTTP_ListRecords_Large-8   	      91	  13032785 ns/op	  321959 B/op	    2549 allocs/op
+BenchmarkHTTP_ListRecords_Large-8   	      88	  12708042 ns/op	  292374 B/op	    2544 allocs/op
+BenchmarkHTTP_ListRecords_Large-8   	      90	  13062657 ns/op	  296350 B/op	    2546 allocs/op
+BenchmarkHTTP_ListRecords_Large-8   	      81	  13308249 ns/op	  312105 B/op	    2547 allocs/op
+BenchmarkHTTP_History-8             	    1057	   1136837 ns/op	   33968 B/op	     416 allocs/op
+BenchmarkHTTP_History-8             	    1081	   1171260 ns/op	   33626 B/op	     415 allocs/op
+BenchmarkHTTP_History-8             	    1020	   1088517 ns/op	   34648 B/op	     416 allocs/op
+BenchmarkHTTP_History-8             	    1166	   1250396 ns/op	   34717 B/op	     416 allocs/op
+BenchmarkHTTP_History-8             	    1027	   1309382 ns/op	   33749 B/op	     415 allocs/op
+BenchmarkHTTP_History-8             	    1095	   1156898 ns/op	   34834 B/op	     416 allocs/op
+BenchmarkHTTP_History-8             	    1124	   1286534 ns/op	   34252 B/op	     416 allocs/op
+BenchmarkHTTP_History-8             	    1125	   1134075 ns/op	   34229 B/op	     416 allocs/op
+BenchmarkHTTP_History-8             	    1052	   1292214 ns/op	   35876 B/op	     416 allocs/op
+BenchmarkHTTP_History-8             	    1118	   1132597 ns/op	   33839 B/op	     416 allocs/op
+PASS
+ok  	github.com/substrate/substrate/internal/api	910.100s

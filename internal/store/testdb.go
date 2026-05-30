@@ -56,35 +56,36 @@ func startShared(ctx context.Context) (string, error) {
 
 // NewTestPool creates a brand-new database in the shared container, applies all
 // migrations, and returns a pool connected to it. Use for per-test isolation.
-func NewTestPool(t *testing.T) *pgxpool.Pool {
-	t.Helper()
+// Accepts testing.TB so both tests (*testing.T) and benchmarks (*testing.B) can call it.
+func NewTestPool(tb testing.TB) *pgxpool.Pool {
+	tb.Helper()
 	ctx := context.Background()
 
 	adminDSN, err := startShared(ctx)
 	if err != nil {
-		t.Fatalf("start shared postgres: %v", err)
+		tb.Fatalf("start shared postgres: %v", err)
 	}
 
 	admin, err := pgxpool.New(ctx, adminDSN)
 	if err != nil {
-		t.Fatalf("connect admin: %v", err)
+		tb.Fatalf("connect admin: %v", err)
 	}
 	defer admin.Close()
 
 	dbName := fmt.Sprintf("test_%d_%d", time.Now().UnixNano(), dbCounter.next())
 	if _, err := admin.Exec(ctx, "CREATE DATABASE "+dbName); err != nil {
-		t.Fatalf("create db %s: %v", dbName, err)
+		tb.Fatalf("create db %s: %v", dbName, err)
 	}
 
 	dsn := replaceDBName(adminDSN, dbName)
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
-		t.Fatalf("connect %s: %v", dbName, err)
+		tb.Fatalf("connect %s: %v", dbName, err)
 	}
 	if err := Migrate(ctx, pool); err != nil {
-		t.Fatalf("migrate: %v", err)
+		tb.Fatalf("migrate: %v", err)
 	}
-	t.Cleanup(func() { pool.Close() })
+	tb.Cleanup(func() { pool.Close() })
 	return pool
 }
 

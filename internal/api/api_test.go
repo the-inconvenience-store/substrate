@@ -36,8 +36,8 @@ func newTestServer(t *testing.T) (*httptest.Server, string) {
 	return srv, key
 }
 
-func do(t *testing.T, method, url, key string, body any) *http.Response {
-	t.Helper()
+func do(tb testing.TB, method, url, key string, body any) *http.Response {
+	tb.Helper()
 	var buf bytes.Buffer
 	if body != nil {
 		_ = json.NewEncoder(&buf).Encode(body)
@@ -47,7 +47,7 @@ func do(t *testing.T, method, url, key string, body any) *http.Response {
 	req.Header.Set("X-Substrate-Actor", "agent-1")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		t.Fatalf("%s %s: %v", method, url, err)
+		tb.Fatalf("%s %s: %v", method, url, err)
 	}
 	return resp
 }

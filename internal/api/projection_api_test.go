@@ -21,17 +21,17 @@ import (
 	"github.com/substrate/substrate/internal/workspace"
 )
 
-func newProjServer(t *testing.T) (*httptest.Server, string, string, uuid.UUID) {
-	t.Helper()
-	pool := store.NewTestPool(t)
+func newProjServer(tb testing.TB) (*httptest.Server, string, string, uuid.UUID) {
+	tb.Helper()
+	pool := store.NewTestPool(tb)
 	wsSvc := workspace.New(pool)
-	w, err := wsSvc.CreateWorkspace(t.Context(), "acme")
+	w, err := wsSvc.CreateWorkspace(tb.Context(), "acme")
 	if err != nil {
-		t.Fatalf("ws: %v", err)
+		tb.Fatalf("ws: %v", err)
 	}
-	key, _, err := wsSvc.CreateAPIKey(t.Context(), w.ID, "test")
+	key, _, err := wsSvc.CreateAPIKey(tb.Context(), w.ID, "test")
 	if err != nil {
-		t.Fatalf("key: %v", err)
+		tb.Fatalf("key: %v", err)
 	}
 	const adminToken = "admin-secret"
 	reg := schema.NewWithIndexer(pool, query.NewIndexer(pool))
@@ -47,16 +47,16 @@ func newProjServer(t *testing.T) (*httptest.Server, string, string, uuid.UUID) {
 		Evaluator:   engine,
 		AdminToken:  adminToken,
 	}))
-	t.Cleanup(srv.Close)
+	tb.Cleanup(srv.Close)
 	return srv, key, adminToken, w.ID
 }
 
-func mustJSONReq(t *testing.T, method, url string, body any) *http.Request {
-	t.Helper()
+func mustJSONReq(tb testing.TB, method, url string, body any) *http.Request {
+	tb.Helper()
 	b, _ := json.Marshal(body)
 	req, err := http.NewRequest(method, url, bytes.NewReader(b))
 	if err != nil {
-		t.Fatalf("req: %v", err)
+		tb.Fatalf("req: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	return req
