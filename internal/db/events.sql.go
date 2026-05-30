@@ -85,7 +85,7 @@ func (q *Queries) GetReplayEvent(ctx context.Context, arg GetReplayEventParams) 
 const getStateAtEvent = `-- name: GetStateAtEvent :one
 SELECT state_after, revision, type
 FROM events e
-WHERE e.workspace_id = $1 AND e.collection_id = $2 AND e.record_id = $3
+WHERE e.workspace_id = $1 AND e.collection_id = $2 AND e.record_id = $3 AND e.type <> 'policy_denied'
   AND e.seq <= (SELECT sub.seq FROM events sub WHERE sub.id = $4)
 ORDER BY e.seq DESC
 LIMIT 1
@@ -119,7 +119,7 @@ func (q *Queries) GetStateAtEvent(ctx context.Context, arg GetStateAtEventParams
 const getStateAtRevision = `-- name: GetStateAtRevision :one
 SELECT state_after, revision, type
 FROM events
-WHERE workspace_id = $1 AND collection_id = $2 AND record_id = $3 AND revision <= $4
+WHERE workspace_id = $1 AND collection_id = $2 AND record_id = $3 AND revision <= $4 AND type <> 'policy_denied'
 ORDER BY seq DESC
 LIMIT 1
 `
@@ -152,7 +152,7 @@ func (q *Queries) GetStateAtRevision(ctx context.Context, arg GetStateAtRevision
 const getStateAtTimestamp = `-- name: GetStateAtTimestamp :one
 SELECT state_after, revision, type
 FROM events
-WHERE workspace_id = $1 AND collection_id = $2 AND record_id = $3 AND created_at <= $4
+WHERE workspace_id = $1 AND collection_id = $2 AND record_id = $3 AND created_at <= $4 AND type <> 'policy_denied'
 ORDER BY seq DESC
 LIMIT 1
 `
@@ -185,7 +185,7 @@ func (q *Queries) GetStateAtTimestamp(ctx context.Context, arg GetStateAtTimesta
 const listRecordEvents = `-- name: ListRecordEvents :many
 SELECT revision, type, actor, state_after, created_at
 FROM events
-WHERE workspace_id = $1 AND collection_id = $2 AND record_id = $3
+WHERE workspace_id = $1 AND collection_id = $2 AND record_id = $3 AND type <> 'policy_denied'
 ORDER BY seq ASC
 `
 
