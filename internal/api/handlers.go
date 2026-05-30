@@ -42,8 +42,9 @@ type handlers struct {
 
 func (h *handlers) createCollection(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Name  string `json:"name"`
-		Level string `json:"level"`
+		Name         string `json:"name"`
+		Level        string `json:"level"`
+		AutoBackfill bool   `json:"auto_backfill"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, apierr.New(apierr.BadRequest, "invalid json"))
@@ -53,6 +54,13 @@ func (h *handlers) createCollection(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeErr(w, err)
 		return
+	}
+	if body.AutoBackfill {
+		if err := h.collections.SetAutoBackfill(r.Context(), c.WorkspaceID, c.ID, true); err != nil {
+			writeErr(w, err)
+			return
+		}
+		c.AutoBackfill = true
 	}
 	httpx.JSON(w, http.StatusCreated, c)
 }
