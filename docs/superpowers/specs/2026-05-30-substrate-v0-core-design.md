@@ -38,7 +38,7 @@ nested-boolean query; OPA/external policy engines (interface seam only).
 | # | Decision | Choice |
 |---|----------|--------|
 | 1 | Storage backend | PostgreSQL (single backing store) via `pgx`; events + JSONB record projections + schemas + policies in one DB. Postgres-*dialect* SQL behind a `Store` interface. |
-| 1b | Embeddable target | Postgres-compatible embedded engine (PGlite / `embedded-postgres`) for single-binary self-host. No second SQL dialect. PGlite-from-Go integration is an open implementation detail (see §10). |
+| 1b | Embeddable target | `embedded-postgres` (managed real Postgres binary) for a low-dependency self-host / dev story. Same Postgres dialect as the external target — no second SQL implementation. |
 | 2 | API protocol | HTTP + JSON (`/v1`). Service logic behind interfaces so gRPC can be added later. |
 | 3 | Auth & tenancy | Workspace-scoped API keys (hashed at rest) + explicit per-request actor identity threaded into audit/policy. |
 | 4 | Schema language | JSON Schema (`santhosh-tekuri/jsonschema` or equivalent) with Substrate metadata (version, lifecycle, indexed fields) wrapped around it. |
@@ -238,14 +238,10 @@ Any step failing rolls back the whole transaction; no partial events or projecti
 - `slog` structured logging with a request/trace ID threaded through context and onto events.
 - `/healthz`, `/readyz`.
 - Substrate's own schema migrations run on startup (embedded migration files).
-- Single static binary; embedded mode gives a zero-external-dependency self-host path.
+- Single static binary; embedded mode (`embedded-postgres`) manages a local Postgres
+  process for a low-friction self-host / dev path with no separately-provisioned database.
 
 ## 10. Open implementation questions (do not block v0 architecture)
 
-- **PGlite-from-Go integration mechanism:** PGlite ships as a WASM Postgres build. Reaching
-  it from a Go process needs a path — a WASM runtime (e.g. `wazero`), or a small sidecar
-  speaking the PG wire protocol, or substituting `embedded-postgres` (real PG binary) as the
-  embedded target. Resolve during implementation; does not affect the `Store` interface or
-  SQL dialect.
 - Exact JSON Schema library/version and its draft support level.
 - Cursor encoding scheme (opaque keyset vs offset) for list pagination.
