@@ -51,12 +51,12 @@ func newProjServer(tb testing.TB) (*httptest.Server, string, string, uuid.UUID) 
 	return srv, key, adminToken, w.ID
 }
 
-func mustJSONReq(t *testing.T, method, url string, body any) *http.Request {
-	t.Helper()
+func mustJSONReq(tb testing.TB, method, url string, body any) *http.Request {
+	tb.Helper()
 	b, _ := json.Marshal(body)
 	req, err := http.NewRequest(method, url, bytes.NewReader(b))
 	if err != nil {
-		t.Fatalf("req: %v", err)
+		tb.Fatalf("req: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	return req
