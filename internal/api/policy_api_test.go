@@ -46,8 +46,8 @@ func newGovServer(t *testing.T) (*httptest.Server, string, string, uuid.UUID, *p
 	return srv, key, adminToken, w.ID, pool
 }
 
-func doAs(t *testing.T, method, url, key, actor string, body any) *http.Response {
-	t.Helper()
+func doAs(tb testing.TB, method, url, key, actor string, body any) *http.Response {
+	tb.Helper()
 	var buf bytes.Buffer
 	if body != nil {
 		_ = json.NewEncoder(&buf).Encode(body)
@@ -59,7 +59,7 @@ func doAs(t *testing.T, method, url, key, actor string, body any) *http.Response
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		t.Fatalf("%s %s: %v", method, url, err)
+		tb.Fatalf("%s %s: %v", method, url, err)
 	}
 	return resp
 }
