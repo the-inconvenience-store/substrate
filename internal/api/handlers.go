@@ -12,6 +12,7 @@ import (
 	"github.com/substrate/substrate/internal/auth"
 	"github.com/substrate/substrate/internal/collection"
 	"github.com/substrate/substrate/internal/httpx"
+	"github.com/substrate/substrate/internal/query"
 	"github.com/substrate/substrate/internal/record"
 	"github.com/substrate/substrate/internal/workspace"
 )
@@ -81,6 +82,29 @@ func (h *handlers) createRecord(w http.ResponseWriter, r *http.Request) {
 	}
 	setETag(w, rec.Revision)
 	httpx.JSON(w, http.StatusCreated, rec)
+}
+
+func (h *handlers) listRecords(w http.ResponseWriter, r *http.Request) {
+	c, err := h.resolveCollection(r, r.PathValue("collection"))
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	v := r.URL.Query()
+	q, err := query.Parse(v["filter"], v.Get("sort"), v.Get("limit"), v.Get("cursor"))
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	items, next, err := h.records.List(r.Context(), c.WorkspaceID, c.ID, q)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	if items == nil {
+		items = []record.Record{}
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "next_cursor": next})
 }
 
 func (h *handlers) getRecord(w http.ResponseWriter, r *http.Request) {

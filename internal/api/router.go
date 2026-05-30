@@ -36,6 +36,7 @@ func NewRouter(d Deps) http.Handler {
 	api := http.NewServeMux()
 	api.HandleFunc("POST /v1/collections", h.createCollection)
 	api.HandleFunc("POST /v1/collections/{collection}/records", h.createRecord)
+	api.HandleFunc("GET /v1/collections/{collection}/records", h.listRecords)
 	api.HandleFunc("GET /v1/collections/{collection}/records/{id}", h.getRecord)
 	api.HandleFunc("PATCH /v1/collections/{collection}/records/{id}", h.updateRecord)
 	api.HandleFunc("DELETE /v1/collections/{collection}/records/{id}", h.deleteRecord)

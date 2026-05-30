@@ -11,6 +11,7 @@ import (
 	"github.com/substrate/substrate/internal/api"
 	"github.com/substrate/substrate/internal/collection"
 	"github.com/substrate/substrate/internal/config"
+	"github.com/substrate/substrate/internal/query"
 	"github.com/substrate/substrate/internal/record"
 	"github.com/substrate/substrate/internal/schema"
 	"github.com/substrate/substrate/internal/store"
@@ -50,7 +51,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	schemaReg := schema.New(pool)
+	schemaReg := schema.NewWithIndexer(pool, query.NewIndexer(pool))
 	router := api.NewRouter(api.Deps{
 		Workspaces:  workspace.New(pool),
 		Collections: collection.New(pool),

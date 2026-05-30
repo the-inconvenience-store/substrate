@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/substrate/substrate/internal/apierr"
 	"github.com/substrate/substrate/internal/db"
+	"github.com/substrate/substrate/internal/query"
 	"github.com/substrate/substrate/internal/store"
 )
 
@@ -151,6 +153,60 @@ func (s *Service) Get(ctx context.Context, ws, col, id uuid.UUID) (Record, error
 		return Record{}, fmt.Errorf("decode data: %w", err)
 	}
 	return rec, nil
+}
+
+// List runs a parsed list query within a workspace+collection and returns the
+// page of records plus an opaque next_cursor ("" when the page is the last one).
+func (s *Service) List(ctx context.Context, ws, col uuid.UUID, q query.ListQuery) ([]Record, string, error) {
+	sqlText, valueArgs, err := query.Build(q)
+	if err != nil {
+		return nil, "", err
+	}
+	args := append([]any{ws, col}, valueArgs...)
+	rows, err := s.pool.Query(ctx, sqlText, args...)
+	if err != nil {
+		return nil, "", fmt.Errorf("list query: %w", err)
+	}
+	defer rows.Close()
+
+	type scanned struct {
+		rec     Record
+		created time.Time
+		sortKey string
+	}
+	var all []scanned
+	for rows.Next() {
+		var (
+			sc      scanned
+			rawData []byte
+			actor   pgtype.Text
+		)
+		if err := rows.Scan(&sc.rec.ID, &sc.rec.Collection, &rawData, &sc.rec.Revision,
+			&sc.rec.Status, &actor, &sc.created, &sc.sortKey); err != nil {
+			return nil, "", fmt.Errorf("scan row: %w", err)
+		}
+		sc.rec.Actor = actor.String
+		if err := json.Unmarshal(rawData, &sc.rec.Data); err != nil {
+			return nil, "", fmt.Errorf("decode data: %w", err)
+		}
+		all = append(all, sc)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, "", fmt.Errorf("iterate rows: %w", err)
+	}
+
+	next := ""
+	if len(all) > q.Limit {
+		last := all[q.Limit-1]
+		all = all[:q.Limit]
+		next = query.NextCursor(q, last.sortKey, last.rec.ID.String())
+	}
+
+	items := make([]Record, len(all))
+	for i, sc := range all {
+		items[i] = sc.rec
+	}
+	return items, next, nil
 }
 
 func (s *Service) Update(ctx context.Context, cmd UpdateCmd) (Record, error) {
