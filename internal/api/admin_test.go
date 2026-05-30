@@ -22,7 +22,7 @@ func TestAdminBootstrap(t *testing.T) {
 	srv := httptest.NewServer(NewRouter(Deps{
 		Workspaces:  workspace.New(pool),
 		Collections: collection.New(pool),
-		Records:     record.New(pool),
+		Records:     record.New(pool, nil),
 		AdminToken:  "secret",
 	}))
 	defer srv.Close()

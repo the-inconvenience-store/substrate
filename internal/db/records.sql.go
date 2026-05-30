@@ -113,17 +113,18 @@ func (q *Queries) GetRecordRevisionForUpdate(ctx context.Context, arg GetRecordR
 }
 
 const insertRecord = `-- name: InsertRecord :exec
-INSERT INTO records (id, collection_id, workspace_id, data, revision, status, actor)
-VALUES ($1, $2, $3, $4, $5, 'active', $6)
+INSERT INTO records (id, collection_id, workspace_id, data, revision, status, actor, schema_version)
+VALUES ($1, $2, $3, $4, $5, 'active', $6, $7)
 `
 
 type InsertRecordParams struct {
-	ID           uuid.UUID   `json:"id"`
-	CollectionID uuid.UUID   `json:"collection_id"`
-	WorkspaceID  uuid.UUID   `json:"workspace_id"`
-	Data         []byte      `json:"data"`
-	Revision     int64       `json:"revision"`
-	Actor        pgtype.Text `json:"actor"`
+	ID            uuid.UUID   `json:"id"`
+	CollectionID  uuid.UUID   `json:"collection_id"`
+	WorkspaceID   uuid.UUID   `json:"workspace_id"`
+	Data          []byte      `json:"data"`
+	Revision      int64       `json:"revision"`
+	Actor         pgtype.Text `json:"actor"`
+	SchemaVersion pgtype.Int4 `json:"schema_version"`
 }
 
 func (q *Queries) InsertRecord(ctx context.Context, arg InsertRecordParams) error {
@@ -134,6 +135,7 @@ func (q *Queries) InsertRecord(ctx context.Context, arg InsertRecordParams) erro
 		arg.Data,
 		arg.Revision,
 		arg.Actor,
+		arg.SchemaVersion,
 	)
 	return err
 }
@@ -185,17 +187,18 @@ func (q *Queries) SoftDeleteRecord(ctx context.Context, arg SoftDeleteRecordPara
 }
 
 const updateRecordData = `-- name: UpdateRecordData :exec
-UPDATE records SET data = $4, revision = $5, actor = $6, updated_at = now()
+UPDATE records SET data = $4, revision = $5, actor = $6, schema_version = $7, updated_at = now()
 WHERE workspace_id = $1 AND collection_id = $2 AND id = $3
 `
 
 type UpdateRecordDataParams struct {
-	WorkspaceID  uuid.UUID   `json:"workspace_id"`
-	CollectionID uuid.UUID   `json:"collection_id"`
-	ID           uuid.UUID   `json:"id"`
-	Data         []byte      `json:"data"`
-	Revision     int64       `json:"revision"`
-	Actor        pgtype.Text `json:"actor"`
+	WorkspaceID   uuid.UUID   `json:"workspace_id"`
+	CollectionID  uuid.UUID   `json:"collection_id"`
+	ID            uuid.UUID   `json:"id"`
+	Data          []byte      `json:"data"`
+	Revision      int64       `json:"revision"`
+	Actor         pgtype.Text `json:"actor"`
+	SchemaVersion pgtype.Int4 `json:"schema_version"`
 }
 
 func (q *Queries) UpdateRecordData(ctx context.Context, arg UpdateRecordDataParams) error {
@@ -206,6 +209,7 @@ func (q *Queries) UpdateRecordData(ctx context.Context, arg UpdateRecordDataPara
 		arg.Data,
 		arg.Revision,
 		arg.Actor,
+		arg.SchemaVersion,
 	)
 	return err
 }
