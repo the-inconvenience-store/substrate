@@ -13,3 +13,15 @@ func JSON(w http.ResponseWriter, status int, v any) {
 		_ = json.NewEncoder(w).Encode(v)
 	}
 }
+
+// Envelope is the standard error body shape.
+type Envelope struct {
+	Error EnvelopeError `json:"error"`
+}
+
+// EnvelopeError is the inner error object.
+type EnvelopeError struct {
+	Code    string         `json:"code"`
+	Message string         `json:"message"`
+	Details map[string]any `json:"details,omitempty"`
+}
