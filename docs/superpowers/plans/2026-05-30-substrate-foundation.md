@@ -1326,7 +1326,30 @@ func TestCreateAndGetCollection(t *testing.T) {
 Run: `go test -tags=integration ./internal/collection/...`
 Expected: FAIL — `undefined: New`.
 
-- [ ] **Step 3: Implement collections**
+- [ ] **Step 3: Add the collection queries and regenerate sqlc**
+
+Create `internal/queries/collections.sql`:
+```sql
+-- name: CreateCollection :one
+INSERT INTO collections (id, workspace_id, name, level)
+VALUES ($1, $2, $3, $4)
+RETURNING id, workspace_id, name, level;
+
+-- name: GetCollectionByName :one
+SELECT id, workspace_id, name, level
+FROM collections
+WHERE workspace_id = $1 AND name = $2;
+```
+Regenerate and build:
+```bash
+go tool sqlc generate
+go build ./...
+```
+This adds `CreateCollection(ctx, CreateCollectionParams) (CreateCollectionRow, error)` and
+`GetCollectionByName(ctx, GetCollectionByNameParams) (GetCollectionByNameRow, error)`.
+Check the generated names/row-struct field names and match them in the service if different.
+
+- [ ] **Step 4: Implement the collection service over the generated queries**
 
 Create `internal/collection/collection.go`:
 ```go
@@ -1339,10 +1362,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/substrate/substrate/internal/apierr"
+	"github.com/substrate/substrate/internal/db"
 )
 
 // Collection is a flexible (v0) object type within a workspace.
@@ -1354,18 +1378,20 @@ type Collection struct {
 }
 
 // Service manages collections.
-type Service struct{ pool *pgxpool.Pool }
+type Service struct {
+	pool *pgxpool.Pool
+	q    *db.Queries
+}
 
-func New(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
+func New(pool *pgxpool.Pool) *Service { return &Service{pool: pool, q: db.New(pool)} }
 
 func (s *Service) Create(ctx context.Context, ws uuid.UUID, name string) (Collection, error) {
 	if name == "" {
 		return Collection{}, apierr.New(apierr.BadRequest, "collection name required")
 	}
-	c := Collection{ID: uuid.New(), WorkspaceID: ws, Name: name, Level: "flexible"}
-	_, err := s.pool.Exec(ctx,
-		`INSERT INTO collections(id, workspace_id, name, level) VALUES($1,$2,$3,$4)`,
-		c.ID, c.WorkspaceID, c.Name, c.Level)
+	row, err := s.q.CreateCollection(ctx, db.CreateCollectionParams{
+		ID: uuid.New(), WorkspaceID: ws, Name: name, Level: "flexible",
+	})
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -1373,34 +1399,33 @@ func (s *Service) Create(ctx context.Context, ws uuid.UUID, name string) (Collec
 		}
 		return Collection{}, fmt.Errorf("insert collection: %w", err)
 	}
-	return c, nil
+	return Collection{ID: row.ID, WorkspaceID: row.WorkspaceID, Name: row.Name, Level: row.Level}, nil
 }
 
 func (s *Service) GetByName(ctx context.Context, ws uuid.UUID, name string) (Collection, error) {
-	var c Collection
-	err := s.pool.QueryRow(ctx,
-		`SELECT id, workspace_id, name, level FROM collections WHERE workspace_id=$1 AND name=$2`,
-		ws, name).Scan(&c.ID, &c.WorkspaceID, &c.Name, &c.Level)
-	if err == pgx.ErrNoRows {
+	row, err := s.q.GetCollectionByName(ctx, db.GetCollectionByNameParams{
+		WorkspaceID: ws, Name: name,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
 		return Collection{}, apierr.New(apierr.NotFound, "collection not found")
 	}
 	if err != nil {
 		return Collection{}, fmt.Errorf("get collection: %w", err)
 	}
-	return c, nil
+	return Collection{ID: row.ID, WorkspaceID: row.WorkspaceID, Name: row.Name, Level: row.Level}, nil
 }
 ```
 
-- [ ] **Step 4: Run the test to confirm it passes**
+- [ ] **Step 5: Run the test to confirm it passes**
 
-Run: `go test -tags=integration ./internal/collection/...`
+Run: `go test -tags=integration -timeout 300s ./internal/collection/...`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add internal/collection
-git commit -m "feat: flexible collection service"
+git add internal/queries internal/db internal/collection
+git commit -m "feat: flexible collection service (sqlc)"
 ```
 
 ---
@@ -1541,7 +1566,67 @@ func TestSoftDelete(t *testing.T) {
 Run: `go test -tags=integration ./internal/record/...`
 Expected: FAIL — `undefined: Service`, `CreateCmd`, etc.
 
-- [ ] **Step 3: Implement the record service**
+- [ ] **Step 3: Add the events + records queries and regenerate sqlc**
+
+Create `internal/queries/events.sql`:
+```sql
+-- name: AppendEvent :exec
+INSERT INTO events (id, workspace_id, collection_id, record_id, type, revision, state_after, actor, idempotency_key)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
+
+-- name: GetReplayEvent :one
+SELECT record_id, collection_id, revision, state_after, actor, type
+FROM events
+WHERE workspace_id = $1 AND idempotency_key = $2
+ORDER BY seq DESC
+LIMIT 1;
+```
+
+Create `internal/queries/records.sql`:
+```sql
+-- name: InsertRecord :exec
+INSERT INTO records (id, collection_id, workspace_id, data, revision, status, actor)
+VALUES ($1, $2, $3, $4, $5, 'active', $6);
+
+-- name: GetActiveRecord :one
+SELECT id, collection_id, data, revision, status, actor
+FROM records
+WHERE workspace_id = $1 AND collection_id = $2 AND id = $3 AND status = 'active';
+
+-- name: GetRecordRevisionForUpdate :one
+SELECT revision
+FROM records
+WHERE workspace_id = $1 AND collection_id = $2 AND id = $3 AND status = 'active'
+FOR UPDATE;
+
+-- name: GetRecordForUpdate :one
+SELECT revision, data
+FROM records
+WHERE workspace_id = $1 AND collection_id = $2 AND id = $3 AND status = 'active'
+FOR UPDATE;
+
+-- name: UpdateRecordData :exec
+UPDATE records SET data = $4, revision = $5, actor = $6, updated_at = now()
+WHERE workspace_id = $1 AND collection_id = $2 AND id = $3;
+
+-- name: SoftDeleteRecord :exec
+UPDATE records SET status = 'deleted', revision = $4, updated_at = now()
+WHERE workspace_id = $1 AND collection_id = $2 AND id = $3;
+```
+
+Regenerate and build:
+```bash
+go tool sqlc generate
+go build ./...
+```
+Open `internal/db/events.sql.go` and `internal/db/records.sql.go` and confirm the generated
+param/row field names. Expected: `AppendEventParams` with `ID, WorkspaceID, CollectionID,
+RecordID, Type, Revision, StateAfter []byte, Actor pgtype.Text, IdempotencyKey pgtype.Text`;
+`GetReplayEventRow` with `RecordID, CollectionID, Revision, StateAfter, Actor, Type`;
+`InsertRecordParams`, `GetActiveRecordRow`, `UpdateRecordDataParams`, `SoftDeleteRecordParams`,
+`GetRecordForUpdateRow{Revision, Data}`. Match the service code to whatever sqlc actually emits.
+
+- [ ] **Step 4: Implement the record service over the generated queries**
 
 Create `internal/record/record.go`:
 ```go
@@ -1556,9 +1641,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/substrate/substrate/internal/apierr"
+	"github.com/substrate/substrate/internal/db"
 	"github.com/substrate/substrate/internal/store"
 )
 
@@ -1593,9 +1680,12 @@ type UpdateCmd struct {
 }
 
 // Service performs record mutations and reads.
-type Service struct{ pool *pgxpool.Pool }
+type Service struct {
+	pool *pgxpool.Pool
+	q    *db.Queries
+}
 
-func New(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
+func New(pool *pgxpool.Pool) *Service { return &Service{pool: pool, q: db.New(pool)} }
 
 func (s *Service) Create(ctx context.Context, cmd CreateCmd) (Record, error) {
 	rec := Record{
@@ -1606,26 +1696,26 @@ func (s *Service) Create(ctx context.Context, cmd CreateCmd) (Record, error) {
 		rec.Data = map[string]any{}
 	}
 	err := store.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
+		qtx := s.q.WithTx(tx)
 		if cmd.IdempotencyKey != "" {
-			if replayed, ok, err := lookupReplay(ctx, tx, cmd.Workspace, cmd.IdempotencyKey); err != nil {
+			if replayed, ok, err := lookupReplay(ctx, qtx, cmd.Workspace, cmd.IdempotencyKey); err != nil {
 				return err
 			} else if ok {
 				rec = replayed
 				return nil
 			}
 		}
-		if err := appendEvent(ctx, tx, eventRow{
+		if err := appendEvent(ctx, qtx, eventRow{
 			Workspace: cmd.Workspace, Collection: cmd.Collection, RecordID: rec.ID,
 			Type: "create", Revision: 1, State: rec.Data, Actor: cmd.Actor,
 			IdempotencyKey: cmd.IdempotencyKey,
 		}); err != nil {
 			return err
 		}
-		_, err := tx.Exec(ctx,
-			`INSERT INTO records(id, collection_id, workspace_id, data, revision, status, actor)
-			 VALUES($1,$2,$3,$4,$5,'active',$6)`,
-			rec.ID, cmd.Collection, cmd.Workspace, mustJSON(rec.Data), 1, cmd.Actor)
-		return err
+		return qtx.InsertRecord(ctx, db.InsertRecordParams{
+			ID: rec.ID, CollectionID: cmd.Collection, WorkspaceID: cmd.Workspace,
+			Data: mustJSON(rec.Data), Revision: 1, Actor: textOrNull(cmd.Actor),
+		})
 	})
 	if err != nil {
 		return Record{}, err
@@ -1634,19 +1724,20 @@ func (s *Service) Create(ctx context.Context, cmd CreateCmd) (Record, error) {
 }
 
 func (s *Service) Get(ctx context.Context, ws, col, id uuid.UUID) (Record, error) {
-	var rec Record
-	var raw []byte
-	err := s.pool.QueryRow(ctx,
-		`SELECT id, collection_id, data, revision, status, COALESCE(actor,'')
-		 FROM records WHERE workspace_id=$1 AND collection_id=$2 AND id=$3 AND status='active'`,
-		ws, col, id).Scan(&rec.ID, &rec.Collection, &raw, &rec.Revision, &rec.Status, &rec.Actor)
-	if err == pgx.ErrNoRows {
+	row, err := s.q.GetActiveRecord(ctx, db.GetActiveRecordParams{
+		WorkspaceID: ws, CollectionID: col, ID: id,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
 		return Record{}, apierr.New(apierr.NotFound, "record not found")
 	}
 	if err != nil {
 		return Record{}, fmt.Errorf("get record: %w", err)
 	}
-	if err := json.Unmarshal(raw, &rec.Data); err != nil {
+	rec := Record{
+		ID: row.ID, Collection: row.CollectionID, Revision: row.Revision,
+		Status: row.Status, Actor: row.Actor.String,
+	}
+	if err := json.Unmarshal(row.Data, &rec.Data); err != nil {
 		return Record{}, fmt.Errorf("decode data: %w", err)
 	}
 	return rec, nil
@@ -1655,20 +1746,19 @@ func (s *Service) Get(ctx context.Context, ws, col, id uuid.UUID) (Record, error
 func (s *Service) Update(ctx context.Context, cmd UpdateCmd) (Record, error) {
 	var rec Record
 	err := store.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
+		qtx := s.q.WithTx(tx)
 		if cmd.IdempotencyKey != "" {
-			if replayed, ok, err := lookupReplay(ctx, tx, cmd.Workspace, cmd.IdempotencyKey); err != nil {
+			if replayed, ok, err := lookupReplay(ctx, qtx, cmd.Workspace, cmd.IdempotencyKey); err != nil {
 				return err
 			} else if ok {
 				rec = replayed
 				return nil
 			}
 		}
-		var current int64
-		err := tx.QueryRow(ctx,
-			`SELECT revision FROM records
-			 WHERE workspace_id=$1 AND collection_id=$2 AND id=$3 AND status='active' FOR UPDATE`,
-			cmd.Workspace, cmd.Collection, cmd.ID).Scan(&current)
-		if err == pgx.ErrNoRows {
+		current, err := qtx.GetRecordRevisionForUpdate(ctx, db.GetRecordRevisionForUpdateParams{
+			WorkspaceID: cmd.Workspace, CollectionID: cmd.Collection, ID: cmd.ID,
+		})
+		if errors.Is(err, pgx.ErrNoRows) {
 			return apierr.New(apierr.NotFound, "record not found")
 		}
 		if err != nil {
@@ -1682,18 +1772,17 @@ func (s *Service) Update(ctx context.Context, cmd UpdateCmd) (Record, error) {
 		if cmd.Data == nil {
 			cmd.Data = map[string]any{}
 		}
-		if err := appendEvent(ctx, tx, eventRow{
+		if err := appendEvent(ctx, qtx, eventRow{
 			Workspace: cmd.Workspace, Collection: cmd.Collection, RecordID: cmd.ID,
 			Type: "update", Revision: next, State: cmd.Data, Actor: cmd.Actor,
 			IdempotencyKey: cmd.IdempotencyKey,
 		}); err != nil {
 			return err
 		}
-		_, err = tx.Exec(ctx,
-			`UPDATE records SET data=$1, revision=$2, actor=$3, updated_at=now()
-			 WHERE workspace_id=$4 AND collection_id=$5 AND id=$6`,
-			mustJSON(cmd.Data), next, cmd.Actor, cmd.Workspace, cmd.Collection, cmd.ID)
-		if err != nil {
+		if err := qtx.UpdateRecordData(ctx, db.UpdateRecordDataParams{
+			WorkspaceID: cmd.Workspace, CollectionID: cmd.Collection, ID: cmd.ID,
+			Data: mustJSON(cmd.Data), Revision: next, Actor: textOrNull(cmd.Actor),
+		}); err != nil {
 			return err
 		}
 		rec = Record{ID: cmd.ID, Collection: cmd.Collection, Data: cmd.Data,
@@ -1708,32 +1797,28 @@ func (s *Service) Update(ctx context.Context, cmd UpdateCmd) (Record, error) {
 
 func (s *Service) Delete(ctx context.Context, ws, col, id uuid.UUID) error {
 	return store.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
-		var current int64
-		var raw []byte
-		err := tx.QueryRow(ctx,
-			`SELECT revision, data FROM records
-			 WHERE workspace_id=$1 AND collection_id=$2 AND id=$3 AND status='active' FOR UPDATE`,
-			ws, col, id).Scan(&current, &raw)
-		if err == pgx.ErrNoRows {
+		qtx := s.q.WithTx(tx)
+		row, err := qtx.GetRecordForUpdate(ctx, db.GetRecordForUpdateParams{
+			WorkspaceID: ws, CollectionID: col, ID: id,
+		})
+		if errors.Is(err, pgx.ErrNoRows) {
 			return apierr.New(apierr.NotFound, "record not found")
 		}
 		if err != nil {
 			return err
 		}
-		next := current + 1
+		next := row.Revision + 1
 		var data map[string]any
-		_ = json.Unmarshal(raw, &data)
-		if err := appendEvent(ctx, tx, eventRow{
+		_ = json.Unmarshal(row.Data, &data)
+		if err := appendEvent(ctx, qtx, eventRow{
 			Workspace: ws, Collection: col, RecordID: id,
 			Type: "delete", Revision: next, State: data,
 		}); err != nil {
 			return err
 		}
-		_, err = tx.Exec(ctx,
-			`UPDATE records SET status='deleted', revision=$1, updated_at=now()
-			 WHERE workspace_id=$2 AND collection_id=$3 AND id=$4`,
-			next, ws, col, id)
-		return err
+		return qtx.SoftDeleteRecord(ctx, db.SoftDeleteRecordParams{
+			WorkspaceID: ws, CollectionID: col, ID: id, Revision: next,
+		})
 	})
 }
 
@@ -1750,20 +1835,17 @@ type eventRow struct {
 	IdempotencyKey string
 }
 
-func appendEvent(ctx context.Context, tx pgx.Tx, e eventRow) error {
-	var key any
-	if e.IdempotencyKey != "" {
-		key = e.IdempotencyKey
-	}
-	_, err := tx.Exec(ctx,
-		`INSERT INTO events(id, workspace_id, collection_id, record_id, type, revision, state_after, actor, idempotency_key)
-		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-		uuid.New(), e.Workspace, e.Collection, e.RecordID, e.Type, e.Revision,
-		mustJSON(e.State), nullStr(e.Actor), key)
+func appendEvent(ctx context.Context, q *db.Queries, e eventRow) error {
+	err := q.AppendEvent(ctx, db.AppendEventParams{
+		ID: uuid.New(), WorkspaceID: e.Workspace, CollectionID: e.Collection,
+		RecordID: e.RecordID, Type: e.Type, Revision: e.Revision,
+		StateAfter: mustJSON(e.State), Actor: textOrNull(e.Actor),
+		IdempotencyKey: textOrNull(e.IdempotencyKey),
+	})
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			// idempotency collision is handled by the caller's replay lookup; treat as conflict otherwise
+			// idempotency collision; the caller's replay lookup handles the happy path
 			return apierr.New(apierr.Conflict, "duplicate idempotency key")
 		}
 		return fmt.Errorf("append event: %w", err)
@@ -1772,30 +1854,24 @@ func appendEvent(ctx context.Context, tx pgx.Tx, e eventRow) error {
 }
 
 // lookupReplay returns the materialized record for a prior idempotency key, if any.
-func lookupReplay(ctx context.Context, tx pgx.Tx, ws uuid.UUID, key string) (Record, bool, error) {
-	var (
-		recordID uuid.UUID
-		col      uuid.UUID
-		rev      int64
-		raw      []byte
-		actor    string
-		typ      string
-	)
-	err := tx.QueryRow(ctx,
-		`SELECT record_id, collection_id, revision, state_after, COALESCE(actor,''), type
-		 FROM events WHERE workspace_id=$1 AND idempotency_key=$2 ORDER BY seq DESC LIMIT 1`,
-		ws, key).Scan(&recordID, &col, &rev, &raw, &actor, &typ)
-	if err == pgx.ErrNoRows {
+func lookupReplay(ctx context.Context, q *db.Queries, ws uuid.UUID, key string) (Record, bool, error) {
+	row, err := q.GetReplayEvent(ctx, db.GetReplayEventParams{
+		WorkspaceID: ws, IdempotencyKey: textOrNull(key),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
 		return Record{}, false, nil
 	}
 	if err != nil {
 		return Record{}, false, fmt.Errorf("replay lookup: %w", err)
 	}
-	rec := Record{ID: recordID, Collection: col, Revision: rev, Status: "active", Actor: actor}
-	if typ == "delete" {
+	rec := Record{
+		ID: row.RecordID, Collection: row.CollectionID, Revision: row.Revision,
+		Status: "active", Actor: row.Actor.String,
+	}
+	if row.Type == "delete" {
 		rec.Status = "deleted"
 	}
-	if err := json.Unmarshal(raw, &rec.Data); err != nil {
+	if err := json.Unmarshal(row.StateAfter, &rec.Data); err != nil {
 		return Record{}, false, fmt.Errorf("decode replay: %w", err)
 	}
 	return rec, true, nil
@@ -1809,24 +1885,26 @@ func mustJSON(v any) []byte {
 	return b
 }
 
-func nullStr(s string) any {
-	if s == "" {
-		return nil
-	}
-	return s
+// textOrNull maps a Go string to a pgtype.Text, treating "" as SQL NULL.
+func textOrNull(s string) pgtype.Text {
+	return pgtype.Text{String: s, Valid: s != ""}
 }
 ```
 
-- [ ] **Step 4: Run the test to confirm it passes**
+> The `eventRow` struct is an internal convenience for the helpers; it is not generated. The
+> generated `*db.Queries.WithTx(tx)` returns a transaction-bound `*db.Queries`, so every
+> mutation in a `store.WithTx` block runs atomically.
 
-Run: `go test -tags=integration ./internal/record/...`
+- [ ] **Step 5: Run the test to confirm it passes**
+
+Run: `go test -tags=integration -timeout 300s ./internal/record/...`
 Expected: PASS (all four tests).
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add internal/record
-git commit -m "feat: record core with events, optimistic concurrency, idempotency, soft delete"
+git add internal/queries internal/db internal/record
+git commit -m "feat: record core with events, optimistic concurrency, idempotency, soft delete (sqlc)"
 ```
 
 ---
@@ -1904,7 +1982,66 @@ func TestHistoryAndAsOfAndRevert(t *testing.T) {
 Run: `go test -tags=integration ./internal/record/...`
 Expected: FAIL — `undefined: History`, `GetAsOf`, `Revert`, `AsOf`.
 
-- [ ] **Step 3: Implement time-travel**
+- [ ] **Step 3: Add the time-travel queries and regenerate sqlc**
+
+Append to `internal/queries/events.sql`:
+```sql
+-- name: ListRecordEvents :many
+SELECT revision, type, actor, state_after, created_at
+FROM events
+WHERE workspace_id = $1 AND collection_id = $2 AND record_id = $3
+ORDER BY seq ASC;
+
+-- name: GetStateAtRevision :one
+SELECT state_after, revision, type
+FROM events
+WHERE workspace_id = $1 AND collection_id = $2 AND record_id = $3 AND revision <= $4
+ORDER BY seq DESC
+LIMIT 1;
+
+-- name: GetStateAtEvent :one
+SELECT state_after, revision, type
+FROM events
+WHERE workspace_id = $1 AND collection_id = $2 AND record_id = $3
+  AND seq <= (SELECT seq FROM events WHERE id = $4)
+ORDER BY seq DESC
+LIMIT 1;
+
+-- name: GetStateAtTimestamp :one
+SELECT state_after, revision, type
+FROM events
+WHERE workspace_id = $1 AND collection_id = $2 AND record_id = $3 AND created_at <= $4
+ORDER BY seq DESC
+LIMIT 1;
+```
+
+Append to `internal/queries/records.sql` (revert needs a no-status-filter lock — you can revert
+a soft-deleted record — and an update that re-activates):
+```sql
+-- name: GetAnyRecordRevisionForUpdate :one
+SELECT revision
+FROM records
+WHERE workspace_id = $1 AND collection_id = $2 AND id = $3
+FOR UPDATE;
+
+-- name: RevertRecordData :exec
+UPDATE records SET data = $4, revision = $5, status = 'active', updated_at = now()
+WHERE workspace_id = $1 AND collection_id = $2 AND id = $3;
+```
+
+Regenerate and build:
+```bash
+go tool sqlc generate
+go build ./...
+```
+Confirm generated names: `ListRecordEventsRow{Revision, Type, Actor pgtype.Text, StateAfter
+[]byte, CreatedAt pgtype.Timestamptz}`; `GetStateAtRevisionRow`/`GetStateAtEventRow`/
+`GetStateAtTimestampRow` each `{StateAfter []byte, Revision int64, Type string}`; their Params
+structs; `GetAnyRecordRevisionForUpdateParams`; `RevertRecordDataParams`. The `GetStateAtEvent`
+param for the subquery `id = $4` may be named `ID` — match whatever sqlc emits. The
+`GetStateAtTimestamp` `created_at <= $4` param is `pgtype.Timestamptz`.
+
+- [ ] **Step 4: Implement time-travel over the generated queries**
 
 Create `internal/record/timetravel.go`:
 ```go
@@ -1913,13 +2050,16 @@ package record
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/substrate/substrate/internal/apierr"
+	"github.com/substrate/substrate/internal/db"
 	"github.com/substrate/substrate/internal/store"
 )
 
@@ -1942,36 +2082,32 @@ type AsOf struct {
 
 // History returns the ordered event stream for a record.
 func (s *Service) History(ctx context.Context, ws, col, id uuid.UUID) ([]HistoryEntry, error) {
-	rows, err := s.pool.Query(ctx,
-		`SELECT revision, type, COALESCE(actor,''), state_after, created_at
-		 FROM events WHERE workspace_id=$1 AND collection_id=$2 AND record_id=$3
-		 ORDER BY seq ASC`, ws, col, id)
+	rows, err := s.q.ListRecordEvents(ctx, db.ListRecordEventsParams{
+		WorkspaceID: ws, CollectionID: col, RecordID: id,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("history query: %w", err)
 	}
-	defer rows.Close()
-
-	var out []HistoryEntry
-	for rows.Next() {
-		var h HistoryEntry
-		var raw []byte
-		if err := rows.Scan(&h.Revision, &h.Type, &h.Actor, &raw, &h.CreatedAt); err != nil {
-			return nil, fmt.Errorf("scan history: %w", err)
+	out := make([]HistoryEntry, 0, len(rows))
+	for _, r := range rows {
+		h := HistoryEntry{
+			Revision: r.Revision, Type: r.Type, Actor: r.Actor.String,
+			CreatedAt: r.CreatedAt.Time,
 		}
-		if len(raw) > 0 {
-			_ = json.Unmarshal(raw, &h.State)
+		if len(r.StateAfter) > 0 {
+			_ = json.Unmarshal(r.StateAfter, &h.State)
 		}
 		out = append(out, h)
 	}
 	if len(out) == 0 {
 		return nil, apierr.New(apierr.NotFound, "record not found")
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 // GetAsOf resolves the record's state at the requested point in time.
 func (s *Service) GetAsOf(ctx context.Context, ws, col, id uuid.UUID, at AsOf) (Record, error) {
-	state, rev, status, err := s.resolveAsOf(ctx, s.pool, ws, col, id, at)
+	state, rev, status, err := s.resolveAsOf(ctx, s.q, ws, col, id, at)
 	if err != nil {
 		return Record{}, err
 	}
@@ -1982,33 +2118,31 @@ func (s *Service) GetAsOf(ctx context.Context, ws, col, id uuid.UUID, at AsOf) (
 func (s *Service) Revert(ctx context.Context, ws, col, id uuid.UUID, to AsOf) (Record, error) {
 	var rec Record
 	err := store.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
-		state, _, _, err := s.resolveAsOfTx(ctx, tx, ws, col, id, to)
+		qtx := s.q.WithTx(tx)
+		state, _, _, err := s.resolveAsOf(ctx, qtx, ws, col, id, to)
 		if err != nil {
 			return err
 		}
-		var current int64
-		err = tx.QueryRow(ctx,
-			`SELECT revision FROM records
-			 WHERE workspace_id=$1 AND collection_id=$2 AND id=$3 FOR UPDATE`,
-			ws, col, id).Scan(&current)
-		if err == pgx.ErrNoRows {
+		current, err := qtx.GetAnyRecordRevisionForUpdate(ctx, db.GetAnyRecordRevisionForUpdateParams{
+			WorkspaceID: ws, CollectionID: col, ID: id,
+		})
+		if errors.Is(err, pgx.ErrNoRows) {
 			return apierr.New(apierr.NotFound, "record not found")
 		}
 		if err != nil {
 			return err
 		}
 		next := current + 1
-		if err := appendEvent(ctx, tx, eventRow{
+		if err := appendEvent(ctx, qtx, eventRow{
 			Workspace: ws, Collection: col, RecordID: id,
 			Type: "revert", Revision: next, State: state,
 		}); err != nil {
 			return err
 		}
-		_, err = tx.Exec(ctx,
-			`UPDATE records SET data=$1, revision=$2, status='active', updated_at=now()
-			 WHERE workspace_id=$3 AND collection_id=$4 AND id=$5`,
-			mustJSON(state), next, ws, col, id)
-		if err != nil {
+		if err := qtx.RevertRecordData(ctx, db.RevertRecordDataParams{
+			WorkspaceID: ws, CollectionID: col, ID: id,
+			Data: mustJSON(state), Revision: next,
+		}); err != nil {
 			return err
 		}
 		rec = Record{ID: id, Collection: col, Data: state, Revision: next, Status: "active"}
@@ -2020,35 +2154,34 @@ func (s *Service) Revert(ctx context.Context, ws, col, id uuid.UUID, to AsOf) (R
 	return rec, nil
 }
 
-// queryer is satisfied by both *pgxpool.Pool and pgx.Tx.
-type queryer interface {
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-}
-
-func (s *Service) resolveAsOf(ctx context.Context, q queryer, ws, col, id uuid.UUID, at AsOf) (map[string]any, int64, string, error) {
-	var raw []byte
-	var rev int64
-	var typ string
-	var err error
+// resolveAsOf reads the record's state at the requested point, using q (which may be the
+// pool-bound or a tx-bound *db.Queries).
+func (s *Service) resolveAsOf(ctx context.Context, q *db.Queries, ws, col, id uuid.UUID, at AsOf) (map[string]any, int64, string, error) {
+	var (
+		raw []byte
+		rev int64
+		typ string
+		err error
+	)
 	switch {
 	case at.Revision > 0:
-		err = q.QueryRow(ctx,
-			`SELECT state_after, revision, type FROM events
-			 WHERE workspace_id=$1 AND collection_id=$2 AND record_id=$3 AND revision<=$4
-			 ORDER BY seq DESC LIMIT 1`, ws, col, id, at.Revision).Scan(&raw, &rev, &typ)
+		row, e := q.GetStateAtRevision(ctx, db.GetStateAtRevisionParams{
+			WorkspaceID: ws, CollectionID: col, RecordID: id, Revision: at.Revision,
+		})
+		raw, rev, typ, err = row.StateAfter, row.Revision, row.Type, e
 	case at.EventID != uuid.Nil:
-		err = q.QueryRow(ctx,
-			`SELECT state_after, revision, type FROM events
-			 WHERE workspace_id=$1 AND collection_id=$2 AND record_id=$3
-			   AND seq <= (SELECT seq FROM events WHERE id=$4)
-			 ORDER BY seq DESC LIMIT 1`, ws, col, id, at.EventID).Scan(&raw, &rev, &typ)
+		row, e := q.GetStateAtEvent(ctx, db.GetStateAtEventParams{
+			WorkspaceID: ws, CollectionID: col, RecordID: id, ID: at.EventID,
+		})
+		raw, rev, typ, err = row.StateAfter, row.Revision, row.Type, e
 	default:
-		err = q.QueryRow(ctx,
-			`SELECT state_after, revision, type FROM events
-			 WHERE workspace_id=$1 AND collection_id=$2 AND record_id=$3 AND created_at<=$4
-			 ORDER BY seq DESC LIMIT 1`, ws, col, id, at.Timestamp).Scan(&raw, &rev, &typ)
+		row, e := q.GetStateAtTimestamp(ctx, db.GetStateAtTimestampParams{
+			WorkspaceID: ws, CollectionID: col, RecordID: id,
+			CreatedAt: pgtype.Timestamptz{Time: at.Timestamp, Valid: true},
+		})
+		raw, rev, typ, err = row.StateAfter, row.Revision, row.Type, e
 	}
-	if err == pgx.ErrNoRows {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, 0, "", apierr.New(apierr.NotFound, "no state at requested point")
 	}
 	if err != nil {
@@ -2064,24 +2197,22 @@ func (s *Service) resolveAsOf(ctx context.Context, q queryer, ws, col, id uuid.U
 	}
 	return state, rev, status, nil
 }
-
-func (s *Service) resolveAsOfTx(ctx context.Context, tx pgx.Tx, ws, col, id uuid.UUID, at AsOf) (map[string]any, int64, string, error) {
-	return s.resolveAsOf(ctx, tx, ws, col, id, at)
-}
 ```
 
-> Remove the unused `strconv` import in the test if `go vet` flags it; the line `_ = strconv.Itoa` keeps it referenced so the test compiles as written.
+> If sqlc named the `GetStateAtEvent` subquery param something other than `ID` (e.g. `ID_2`),
+> match the generated field name. The three `GetStateAt*` row types are distinct structs that
+> happen to share the same fields — that's why each `case` constructs its own call.
 
-- [ ] **Step 4: Run the test to confirm it passes**
+- [ ] **Step 5: Run the test to confirm it passes**
 
-Run: `go test -tags=integration ./internal/record/...`
+Run: `go test -tags=integration -timeout 300s ./internal/record/...`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add internal/record
-git commit -m "feat: time-travel history, point-in-time read, and revert"
+git add internal/queries internal/db internal/record
+git commit -m "feat: time-travel history, point-in-time read, and revert (sqlc)"
 ```
 
 ---
