@@ -15,6 +15,7 @@ type Deps struct {
 	Workspaces  *workspace.Service
 	Collections *collection.Service
 	Records     *record.Service
+	AdminToken  string
 }
 
 // NewRouter builds the HTTP handler for the whole API.
@@ -41,5 +42,10 @@ func NewRouter(d Deps) http.Handler {
 
 	protected := auth.Middleware(d.Workspaces)(api)
 	mux.Handle("/v1/", protected)
+
+	admin := &adminHandlers{workspaces: d.Workspaces, token: d.AdminToken}
+	mux.HandleFunc("POST /admin/workspaces", admin.createWorkspace)
+	mux.HandleFunc("POST /admin/workspaces/{ws}/api-keys", admin.createKey)
+
 	return mux
 }

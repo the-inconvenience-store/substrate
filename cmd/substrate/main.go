@@ -53,6 +53,7 @@ func main() {
 		Workspaces:  workspace.New(pool),
 		Collections: collection.New(pool),
 		Records:     record.New(pool),
+		AdminToken:  cfg.AdminToken,
 	})
 
 	logger.Info("substrate starting", "addr", cfg.Addr, "embedded", cfg.Embedded)

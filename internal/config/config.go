@@ -8,6 +8,7 @@ type Config struct {
 	DatabaseURL string
 	Embedded    bool
 	LogLevel    string
+	AdminToken  string
 }
 
 // Load parses flags (args, without program name) with environment fallback.
@@ -18,6 +19,7 @@ func Load(args []string, getenv func(string) string) Config {
 	dbURL := fs.String("database-url", "", "postgres DSN (external mode)")
 	embedded := fs.Bool("embedded", false, "run an embedded postgres")
 	logLevel := fs.String("log-level", "info", "log level")
+	adminToken := fs.String("admin-token", "", "bootstrap admin token")
 	_ = fs.Parse(args)
 
 	c := Config{
@@ -25,12 +27,16 @@ func Load(args []string, getenv func(string) string) Config {
 		DatabaseURL: *dbURL,
 		Embedded:    *embedded,
 		LogLevel:    *logLevel,
+		AdminToken:  *adminToken,
 	}
 	if v := getenv("SUBSTRATE_DATABASE_URL"); v != "" && c.DatabaseURL == "" {
 		c.DatabaseURL = v
 	}
 	if getenv("SUBSTRATE_EMBEDDED") == "true" {
 		c.Embedded = true
+	}
+	if v := getenv("SUBSTRATE_ADMIN_TOKEN"); v != "" && c.AdminToken == "" {
+		c.AdminToken = v
 	}
 	return c
 }

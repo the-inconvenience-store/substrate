@@ -13,6 +13,7 @@ import (
 	"github.com/substrate/substrate/internal/collection"
 	"github.com/substrate/substrate/internal/httpx"
 	"github.com/substrate/substrate/internal/record"
+	"github.com/substrate/substrate/internal/workspace"
 )
 
 func writeErr(w http.ResponseWriter, err error) {
@@ -254,4 +255,57 @@ func parseAsOf(s string) (record.AsOf, error) {
 
 func parseTime(s string) (time.Time, error) {
 	return time.Parse(time.RFC3339, s)
+}
+
+// --- admin handlers ---
+
+type adminHandlers struct {
+	workspaces *workspace.Service
+	token      string
+}
+
+func (a *adminHandlers) authed(r *http.Request) bool {
+	return a.token != "" && r.Header.Get("X-Admin-Token") == a.token
+}
+
+func (a *adminHandlers) createWorkspace(w http.ResponseWriter, r *http.Request) {
+	if !a.authed(r) {
+		writeErr(w, apierr.New(apierr.Unauthorized, "invalid admin token"))
+		return
+	}
+	var body struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeErr(w, apierr.New(apierr.BadRequest, "invalid json"))
+		return
+	}
+	ws, err := a.workspaces.CreateWorkspace(r.Context(), body.Name)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, ws)
+}
+
+func (a *adminHandlers) createKey(w http.ResponseWriter, r *http.Request) {
+	if !a.authed(r) {
+		writeErr(w, apierr.New(apierr.Unauthorized, "invalid admin token"))
+		return
+	}
+	wsID, err := uuid.Parse(r.PathValue("ws"))
+	if err != nil {
+		writeErr(w, apierr.New(apierr.BadRequest, "invalid workspace id"))
+		return
+	}
+	var body struct {
+		Label string `json:"label"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	plaintext, id, err := a.workspaces.CreateAPIKey(r.Context(), wsID, body.Label)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, map[string]any{"id": id, "key": plaintext})
 }
