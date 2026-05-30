@@ -12,6 +12,7 @@ import (
 	"github.com/substrate/substrate/internal/auth"
 	"github.com/substrate/substrate/internal/collection"
 	"github.com/substrate/substrate/internal/httpx"
+	"github.com/substrate/substrate/internal/projection"
 	"github.com/substrate/substrate/internal/query"
 	"github.com/substrate/substrate/internal/record"
 	"github.com/substrate/substrate/internal/workspace"
@@ -294,6 +295,7 @@ func parseTime(s string) (time.Time, error) {
 type adminHandlers struct {
 	workspaces *workspace.Service
 	token      string
+	replayer   *projection.Replayer
 }
 
 func (a *adminHandlers) authed(r *http.Request) bool {

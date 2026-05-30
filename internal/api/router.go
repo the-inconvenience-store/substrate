@@ -8,6 +8,7 @@ import (
 	"github.com/substrate/substrate/internal/collection"
 	"github.com/substrate/substrate/internal/httpx"
 	"github.com/substrate/substrate/internal/policy"
+	"github.com/substrate/substrate/internal/projection"
 	"github.com/substrate/substrate/internal/record"
 	"github.com/substrate/substrate/internal/schema"
 	"github.com/substrate/substrate/internal/workspace"
@@ -21,6 +22,8 @@ type Deps struct {
 	Schemas     *schema.Service
 	Policies    *policy.Service
 	Audit       *audit.Service
+	Backfiller  *projection.Backfiller
+	Replayer    *projection.Replayer
 	AdminToken  string
 }
 
@@ -64,13 +67,18 @@ func NewRouter(d Deps) http.Handler {
 	aud := &auditHandlers{h: h, audit: d.Audit}
 	api.HandleFunc("GET /v1/audit", aud.list)
 
+	pjh := &projectionHandlers{h: h, backfiller: d.Backfiller}
+	api.HandleFunc("POST /v1/collections/{collection}/backfill", pjh.backfill)
+	api.HandleFunc("POST /v1/collections/{collection}/auto-backfill", pjh.setAutoBackfill)
+
 	protected := auth.Middleware(d.Workspaces)(api)
 	mux.Handle("/v1/", protected)
 
-	admin := &adminHandlers{workspaces: d.Workspaces, token: d.AdminToken}
+	admin := &adminHandlers{workspaces: d.Workspaces, token: d.AdminToken, replayer: d.Replayer}
 	mux.HandleFunc("POST /admin/workspaces", admin.createWorkspace)
 	mux.HandleFunc("POST /admin/workspaces/{ws}/api-keys", admin.createKey)
 	mux.HandleFunc("PUT /admin/workspaces/{ws}/policy-mode", admin.setPolicyMode)
+	mux.HandleFunc("POST /admin/replay", admin.replay)
 
 	return mux
 }
