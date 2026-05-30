@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -9,6 +8,7 @@ import (
 	"github.com/substrate/substrate/internal/apierr"
 	"github.com/substrate/substrate/internal/auth"
 	"github.com/substrate/substrate/internal/httpx"
+	"github.com/substrate/substrate/internal/jsonx"
 	"github.com/substrate/substrate/internal/policy"
 )
 
@@ -25,7 +25,7 @@ func (ph *policyHandlers) create(w http.ResponseWriter, r *http.Request) {
 		Operation  string `json:"operation"`
 		Effect     string `json:"effect"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := jsonx.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, apierr.New(apierr.BadRequest, "invalid json"))
 		return
 	}
@@ -93,7 +93,7 @@ func (a *adminHandlers) setPolicyMode(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Mode string `json:"mode"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := jsonx.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, apierr.New(apierr.BadRequest, "invalid json"))
 		return
 	}

@@ -2,7 +2,6 @@ package schema
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -14,6 +13,7 @@ import (
 
 	"github.com/substrate/substrate/internal/apierr"
 	"github.com/substrate/substrate/internal/db"
+	"github.com/substrate/substrate/internal/jsonx"
 	"github.com/substrate/substrate/internal/policy"
 	"github.com/substrate/substrate/internal/store"
 )
@@ -111,7 +111,7 @@ func (s *Service) ensureActiveIndexes(ctx context.Context, col uuid.UUID) error 
 		return fmt.Errorf("load active version for indexing: %w", err)
 	}
 	var fields []string
-	_ = json.Unmarshal(full.IndexedFields, &fields)
+	_ = jsonx.Unmarshal(full.IndexedFields, &fields)
 	if len(fields) == 0 {
 		return nil
 	}
@@ -132,7 +132,7 @@ func (s *Service) enqueueBackfill(ctx context.Context, ws, col uuid.UUID) {
 
 // compileSchema validates that doc is a usable JSON Schema (draft 2020-12).
 func compileSchema(doc map[string]any) error {
-	raw, err := json.Marshal(doc)
+	raw, err := jsonx.Marshal(doc)
 	if err != nil {
 		return apierr.New(apierr.SchemaInvalid, "schema is not JSON-encodable")
 	}
@@ -165,8 +165,8 @@ func (s *Service) Register(ctx context.Context, cmd RegisterCmd) (SchemaVersion,
 	if err := compileSchema(cmd.JSONSchema); err != nil {
 		return SchemaVersion{}, err
 	}
-	rawSchema, _ := json.Marshal(cmd.JSONSchema)
-	idxRaw, _ := json.Marshal(normStrings(cmd.IndexedFields))
+	rawSchema, _ := jsonx.Marshal(cmd.JSONSchema)
+	idxRaw, _ := jsonx.Marshal(normStrings(cmd.IndexedFields))
 
 	var result SchemaVersion
 	err = store.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
@@ -247,9 +247,9 @@ func (s *Service) Get(ctx context.Context, col uuid.UUID, version int) (SchemaVe
 		return SchemaVersion{}, fmt.Errorf("get schema: %w", err)
 	}
 	var doc map[string]any
-	_ = json.Unmarshal(row.JsonSchema, &doc)
+	_ = jsonx.Unmarshal(row.JsonSchema, &doc)
 	var idx []string
-	_ = json.Unmarshal(row.IndexedFields, &idx)
+	_ = jsonx.Unmarshal(row.IndexedFields, &idx)
 	return SchemaVersion{Version: int(row.Version), Lifecycle: row.Lifecycle, IndexedFields: idx, JSONSchema: doc}, nil
 }
 
@@ -262,7 +262,7 @@ func (s *Service) List(ctx context.Context, col uuid.UUID) ([]SchemaVersion, err
 	out := make([]SchemaVersion, 0, len(rows))
 	for _, r := range rows {
 		var idx []string
-		_ = json.Unmarshal(r.IndexedFields, &idx)
+		_ = jsonx.Unmarshal(r.IndexedFields, &idx)
 		out = append(out, SchemaVersion{Version: int(r.Version), Lifecycle: r.Lifecycle, IndexedFields: idx})
 	}
 	return out, nil
@@ -279,7 +279,7 @@ func (s *Service) checkCompatibleTx(ctx context.Context, q *db.Queries, col uuid
 		return fmt.Errorf("load prior schema: %w", err)
 	}
 	var priorDoc map[string]any
-	if err := json.Unmarshal(prior.JsonSchema, &priorDoc); err != nil {
+	if err := jsonx.Unmarshal(prior.JsonSchema, &priorDoc); err != nil {
 		return fmt.Errorf("decode prior schema: %w", err)
 	}
 	changes := Classify(priorDoc, candidate)
@@ -347,7 +347,7 @@ func (s *Service) Activate(ctx context.Context, ws, col uuid.UUID, version int, 
 		}
 		if c.ActiveSchemaVersion.Valid && c.ActiveSchemaVersion.Int32 != int32(version) {
 			var candidate map[string]any
-			if err := json.Unmarshal(target.JsonSchema, &candidate); err != nil {
+			if err := jsonx.Unmarshal(target.JsonSchema, &candidate); err != nil {
 				return fmt.Errorf("decode candidate: %w", err)
 			}
 			if err := s.checkCompatibleTx(ctx, qtx, col, c.ActiveSchemaVersion.Int32, candidate, force); err != nil {
@@ -406,7 +406,7 @@ func (s *Service) Deprecate(ctx context.Context, ws, col uuid.UUID, version int,
 // The event is collection-scoped: record_id is the collection id; revision is the schema version.
 // state_after is written as {"version":<n>,"lifecycle":"<lifecycle>"}.
 func appendSchemaEvent(ctx context.Context, q *db.Queries, col uuid.UUID, ws uuid.UUID, typ string, version int64, lifecycle string, actor string, trace []byte) error {
-	stateAfter, _ := json.Marshal(map[string]any{"version": version, "lifecycle": lifecycle})
+	stateAfter, _ := jsonx.Marshal(map[string]any{"version": version, "lifecycle": lifecycle})
 	return q.AppendEvent(ctx, db.AppendEventParams{
 		ID: uuid.New(), WorkspaceID: ws, CollectionID: col, RecordID: col,
 		Type: typ, Revision: version, StateAfter: stateAfter,

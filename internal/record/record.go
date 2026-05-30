@@ -2,7 +2,6 @@ package record
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/substrate/substrate/internal/apierr"
 	"github.com/substrate/substrate/internal/db"
+	"github.com/substrate/substrate/internal/jsonx"
 	"github.com/substrate/substrate/internal/policy"
 	"github.com/substrate/substrate/internal/query"
 	"github.com/substrate/substrate/internal/store"
@@ -185,7 +185,7 @@ func (s *Service) Get(ctx context.Context, ws, col, id uuid.UUID, actor string) 
 		ID: row.ID, Collection: row.CollectionID, Revision: row.Revision,
 		Status: row.Status, Actor: row.Actor.String,
 	}
-	if err := json.Unmarshal(row.Data, &rec.Data); err != nil {
+	if err := jsonx.Unmarshal(row.Data, &rec.Data); err != nil {
 		return Record{}, fmt.Errorf("decode data: %w", err)
 	}
 	return rec, nil
@@ -227,7 +227,7 @@ func (s *Service) List(ctx context.Context, ws, col uuid.UUID, actor string, q q
 			return nil, "", fmt.Errorf("scan row: %w", err)
 		}
 		sc.rec.Actor = actor.String
-		if err := json.Unmarshal(rawData, &sc.rec.Data); err != nil {
+		if err := jsonx.Unmarshal(rawData, &sc.rec.Data); err != nil {
 			return nil, "", fmt.Errorf("decode data: %w", err)
 		}
 		all = append(all, sc)
@@ -347,7 +347,7 @@ func (s *Service) Delete(ctx context.Context, ws, col, id uuid.UUID, actor strin
 		}
 		next := row.Revision + 1
 		var data map[string]any
-		_ = json.Unmarshal(row.Data, &data)
+		_ = jsonx.Unmarshal(row.Data, &data)
 		if err := appendEvent(ctx, qtx, eventRow{
 			Workspace: ws, Collection: col, RecordID: id,
 			Type: "delete", Revision: next, State: data, Actor: actor,
@@ -425,14 +425,14 @@ func lookupReplay(ctx context.Context, q *db.Queries, ws uuid.UUID, key string) 
 	if row.Type == "delete" {
 		rec.Status = "deleted"
 	}
-	if err := json.Unmarshal(row.StateAfter, &rec.Data); err != nil {
+	if err := jsonx.Unmarshal(row.StateAfter, &rec.Data); err != nil {
 		return Record{}, false, fmt.Errorf("decode replay: %w", err)
 	}
 	return rec, true, nil
 }
 
 func mustJSON(v any) []byte {
-	b, err := json.Marshal(v)
+	b, err := jsonx.Marshal(v)
 	if err != nil {
 		panic(fmt.Sprintf("marshal: %v", err))
 	}

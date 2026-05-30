@@ -3,7 +3,6 @@ package projection
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -15,6 +14,7 @@ import (
 
 	"github.com/substrate/substrate/internal/apierr"
 	"github.com/substrate/substrate/internal/db"
+	"github.com/substrate/substrate/internal/jsonx"
 	"github.com/substrate/substrate/internal/schema"
 	"github.com/substrate/substrate/internal/store"
 )
@@ -120,7 +120,7 @@ func (b *Backfiller) migrateOne(ctx context.Context, ws, col, id uuid.UUID, acti
 			return nil // advanced by a concurrent write
 		}
 		var data map[string]any
-		if err := json.Unmarshal(row.Data, &data); err != nil {
+		if err := jsonx.Unmarshal(row.Data, &data); err != nil {
 			return fmt.Errorf("decode data: %w", err)
 		}
 		if data == nil {
@@ -131,7 +131,7 @@ func (b *Backfiller) migrateOne(ctx context.Context, ws, col, id uuid.UUID, acti
 			return nil // invalid under active schema: skip, leave untouched
 		}
 		next := row.Revision + 1
-		raw, err := json.Marshal(migratedData)
+		raw, err := jsonx.Marshal(migratedData)
 		if err != nil {
 			return fmt.Errorf("encode migrated: %w", err)
 		}

@@ -1,7 +1,11 @@
 // Package projection rebuilds and advances the records current-state projection.
 package projection
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/substrate/substrate/internal/jsonx"
+)
 
 // schemaDefaults holds a schema's top-level property defaults, pre-extracted from
 // the schema JSON so a backfill run can parse the schema once (parseDefaults) and
@@ -20,7 +24,7 @@ func parseDefaults(schemaRaw []byte) schemaDefaults {
 			Default json.RawMessage `json:"default"`
 		} `json:"properties"`
 	}
-	if err := json.Unmarshal(schemaRaw, &doc); err != nil || len(doc.Properties) == 0 {
+	if err := jsonx.Unmarshal(schemaRaw, &doc); err != nil || len(doc.Properties) == 0 {
 		return nil
 	}
 	var d schemaDefaults
@@ -46,7 +50,7 @@ func (d schemaDefaults) apply(data map[string]any) (map[string]any, bool) {
 			continue
 		}
 		var v any
-		if err := json.Unmarshal(raw, &v); err != nil {
+		if err := jsonx.Unmarshal(raw, &v); err != nil {
 			continue
 		}
 		if !changed {

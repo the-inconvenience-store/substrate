@@ -2,7 +2,6 @@ package record
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/substrate/substrate/internal/apierr"
 	"github.com/substrate/substrate/internal/db"
+	"github.com/substrate/substrate/internal/jsonx"
 	"github.com/substrate/substrate/internal/policy"
 	"github.com/substrate/substrate/internal/store"
 )
@@ -57,7 +57,7 @@ func (s *Service) History(ctx context.Context, ws, col, id uuid.UUID, actor stri
 			CreatedAt: r.CreatedAt.Time,
 		}
 		if len(r.StateAfter) > 0 {
-			_ = json.Unmarshal(r.StateAfter, &h.State)
+			_ = jsonx.Unmarshal(r.StateAfter, &h.State)
 		}
 		out = append(out, h)
 	}
@@ -165,7 +165,7 @@ func (s *Service) resolveAsOf(ctx context.Context, q *db.Queries, ws, col, id uu
 	}
 	state := map[string]any{}
 	if len(raw) > 0 {
-		_ = json.Unmarshal(raw, &state)
+		_ = jsonx.Unmarshal(raw, &state)
 	}
 	status := "active"
 	if typ == "delete" {

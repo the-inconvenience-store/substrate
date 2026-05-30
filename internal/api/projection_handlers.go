@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -10,6 +9,7 @@ import (
 	"github.com/substrate/substrate/internal/auth"
 	"github.com/substrate/substrate/internal/collection"
 	"github.com/substrate/substrate/internal/httpx"
+	"github.com/substrate/substrate/internal/jsonx"
 	"github.com/substrate/substrate/internal/policy"
 	"github.com/substrate/substrate/internal/projection"
 )
@@ -64,7 +64,7 @@ func (p *projectionHandlers) setAutoBackfill(w http.ResponseWriter, r *http.Requ
 	var body struct {
 		Enabled bool `json:"enabled"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := jsonx.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, apierr.New(apierr.BadRequest, "invalid json"))
 		return
 	}
@@ -86,7 +86,7 @@ func (a *adminHandlers) replay(w http.ResponseWriter, r *http.Request) {
 		CollectionID string `json:"collection_id"`
 		RecordID     string `json:"record_id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := jsonx.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, apierr.New(apierr.BadRequest, "invalid json"))
 		return
 	}

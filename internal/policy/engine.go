@@ -2,7 +2,6 @@ package policy
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/substrate/substrate/internal/apierr"
 	"github.com/substrate/substrate/internal/db"
+	"github.com/substrate/substrate/internal/jsonx"
 )
 
 // Evaluator authorizes an operation. On deny it records a policy_denied event and
@@ -96,7 +96,7 @@ func (d Decision) TraceJSON(op string) []byte {
 	if d.MatchedRule != nil {
 		m["matched_rule"] = d.MatchedRule.String()
 	}
-	b, _ := json.Marshal(m)
+	b, _ := jsonx.Marshal(m)
 	return b
 }
 
