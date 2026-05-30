@@ -7,3 +7,9 @@ RETURNING id, name, policy_mode, created_at;
 SELECT id, name, policy_mode, created_at
 FROM workspaces
 WHERE id = $1;
+
+-- name: GetWorkspacePolicyMode :one
+SELECT policy_mode FROM workspaces WHERE id = $1;
+
+-- name: SetWorkspacePolicyMode :exec
+UPDATE workspaces SET policy_mode = $2 WHERE id = $1;

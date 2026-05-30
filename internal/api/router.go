@@ -3,9 +3,11 @@ package api
 import (
 	"net/http"
 
+	"github.com/substrate/substrate/internal/audit"
 	"github.com/substrate/substrate/internal/auth"
 	"github.com/substrate/substrate/internal/collection"
 	"github.com/substrate/substrate/internal/httpx"
+	"github.com/substrate/substrate/internal/policy"
 	"github.com/substrate/substrate/internal/record"
 	"github.com/substrate/substrate/internal/schema"
 	"github.com/substrate/substrate/internal/workspace"
@@ -17,6 +19,8 @@ type Deps struct {
 	Collections *collection.Service
 	Records     *record.Service
 	Schemas     *schema.Service
+	Policies    *policy.Service
+	Audit       *audit.Service
 	AdminToken  string
 }
 
@@ -52,12 +56,21 @@ func NewRouter(d Deps) http.Handler {
 	api.HandleFunc("POST /v1/collections/{collection}/schemas/{version}/activate", sh.activate)
 	api.HandleFunc("POST /v1/collections/{collection}/schemas/{version}/deprecate", sh.deprecate)
 
+	ph := &policyHandlers{h: h, policies: d.Policies}
+	api.HandleFunc("POST /v1/policies", ph.create)
+	api.HandleFunc("GET /v1/policies", ph.list)
+	api.HandleFunc("DELETE /v1/policies/{id}", ph.delete)
+
+	aud := &auditHandlers{h: h, audit: d.Audit}
+	api.HandleFunc("GET /v1/audit", aud.list)
+
 	protected := auth.Middleware(d.Workspaces)(api)
 	mux.Handle("/v1/", protected)
 
 	admin := &adminHandlers{workspaces: d.Workspaces, token: d.AdminToken}
 	mux.HandleFunc("POST /admin/workspaces", admin.createWorkspace)
 	mux.HandleFunc("POST /admin/workspaces/{ws}/api-keys", admin.createKey)
+	mux.HandleFunc("PUT /admin/workspaces/{ws}/policy-mode", admin.setPolicyMode)
 
 	return mux
 }

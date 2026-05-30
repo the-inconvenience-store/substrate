@@ -17,7 +17,7 @@ func TestHistoryAndAsOfAndRevert(t *testing.T) {
 	_, _ = svc.Update(ctx, UpdateCmd{Workspace: ws, Collection: col, ID: rec.ID, ExpectedRevision: 2, Data: map[string]any{"n": float64(3)}})
 
 	// History has 3 entries in order.
-	hist, err := svc.History(ctx, ws, col, rec.ID)
+	hist, err := svc.History(ctx, ws, col, rec.ID, "tester")
 	if err != nil {
 		t.Fatalf("history: %v", err)
 	}
@@ -29,7 +29,7 @@ func TestHistoryAndAsOfAndRevert(t *testing.T) {
 	}
 
 	// Point-in-time read at revision 1.
-	old, err := svc.GetAsOf(ctx, ws, col, rec.ID, AsOf{Revision: 1})
+	old, err := svc.GetAsOf(ctx, ws, col, rec.ID, AsOf{Revision: 1}, "tester")
 	if err != nil {
 		t.Fatalf("as-of: %v", err)
 	}
@@ -47,7 +47,7 @@ func TestHistoryAndAsOfAndRevert(t *testing.T) {
 	}
 
 	// Current read now reflects the revert.
-	cur, _ := svc.Get(ctx, ws, col, rec.ID)
+	cur, _ := svc.Get(ctx, ws, col, rec.ID, "tester")
 	if cur.Data["n"] != float64(1) {
 		t.Fatalf("current n = %v, want 1", cur.Data["n"])
 	}

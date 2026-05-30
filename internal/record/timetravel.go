@@ -13,6 +13,7 @@ import (
 
 	"github.com/substrate/substrate/internal/apierr"
 	"github.com/substrate/substrate/internal/db"
+	"github.com/substrate/substrate/internal/policy"
 	"github.com/substrate/substrate/internal/store"
 )
 
@@ -35,7 +36,12 @@ type AsOf struct {
 
 // History returns the ordered event stream for a record.
 // Returns NotFound if the record has no events.
-func (s *Service) History(ctx context.Context, ws, col, id uuid.UUID) ([]HistoryEntry, error) {
+func (s *Service) History(ctx context.Context, ws, col, id uuid.UUID, actor string) ([]HistoryEntry, error) {
+	if _, err := s.authorize(ctx, policy.Request{
+		Workspace: ws, Actor: actor, Collection: col, Target: id, Operation: policy.OpRead,
+	}); err != nil {
+		return nil, err
+	}
 	rows, err := s.q.ListRecordEvents(ctx, db.ListRecordEventsParams{
 		WorkspaceID: ws, CollectionID: col, RecordID: id,
 	})
@@ -62,7 +68,12 @@ func (s *Service) History(ctx context.Context, ws, col, id uuid.UUID) ([]History
 }
 
 // GetAsOf resolves the record's state at the requested point in time.
-func (s *Service) GetAsOf(ctx context.Context, ws, col, id uuid.UUID, at AsOf) (Record, error) {
+func (s *Service) GetAsOf(ctx context.Context, ws, col, id uuid.UUID, at AsOf, actor string) (Record, error) {
+	if _, err := s.authorize(ctx, policy.Request{
+		Workspace: ws, Actor: actor, Collection: col, Target: id, Operation: policy.OpRead,
+	}); err != nil {
+		return Record{}, err
+	}
 	state, rev, status, err := s.resolveAsOf(ctx, s.q, ws, col, id, at)
 	if err != nil {
 		return Record{}, err
@@ -73,6 +84,12 @@ func (s *Service) GetAsOf(ctx context.Context, ws, col, id uuid.UUID, at AsOf) (
 // Revert appends a new forward "revert" event restoring the record to a prior point.
 // The record is re-activated if it was soft-deleted. Revision bumps by 1.
 func (s *Service) Revert(ctx context.Context, ws, col, id uuid.UUID, to AsOf, actor string) (Record, error) {
+	dec, aerr := s.authorize(ctx, policy.Request{
+		Workspace: ws, Actor: actor, Collection: col, Target: id, Operation: policy.OpUpdate,
+	})
+	if aerr != nil {
+		return Record{}, aerr
+	}
 	var rec Record
 	err := store.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
 		qtx := s.q.WithTx(tx)
@@ -93,6 +110,7 @@ func (s *Service) Revert(ctx context.Context, ws, col, id uuid.UUID, to AsOf, ac
 		if err := appendEvent(ctx, qtx, eventRow{
 			Workspace: ws, Collection: col, RecordID: id,
 			Type: "revert", Revision: next, State: state, Actor: actor,
+			Trace: s.policyTrace(dec, policy.OpUpdate),
 		}); err != nil {
 			return err
 		}

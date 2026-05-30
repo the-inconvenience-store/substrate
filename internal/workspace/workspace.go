@@ -62,6 +62,17 @@ func (s *Service) CreateAPIKey(ctx context.Context, ws uuid.UUID, label string) 
 	return plaintext, id, nil
 }
 
+// SetPolicyMode flips the workspace's default policy mode ("allow" | "deny").
+func (s *Service) SetPolicyMode(ctx context.Context, ws uuid.UUID, mode string) error {
+	if mode != "allow" && mode != "deny" {
+		return apierr.New(apierr.BadRequest, "mode must be 'allow' or 'deny'")
+	}
+	if err := s.q.SetWorkspacePolicyMode(ctx, db.SetWorkspacePolicyModeParams{ID: ws, PolicyMode: mode}); err != nil {
+		return fmt.Errorf("set policy mode: %w", err)
+	}
+	return nil
+}
+
 // VerifyKey resolves a plaintext key to its workspace, or returns an Unauthorized error.
 func (s *Service) VerifyKey(ctx context.Context, plaintext string) (uuid.UUID, error) {
 	sum := sha256.Sum256([]byte(plaintext))

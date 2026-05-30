@@ -47,7 +47,7 @@ func TestCreateAndGet(t *testing.T) {
 		t.Fatalf("revision = %d, want 1", rec.Revision)
 	}
 
-	got, err := svc.Get(ctx, ws, col, rec.ID)
+	got, err := svc.Get(ctx, ws, col, rec.ID, "tester")
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -111,7 +111,7 @@ func TestSoftDelete(t *testing.T) {
 	if err := svc.Delete(ctx, ws, col, rec.ID, "agent-1"); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
-	_, err := svc.Get(ctx, ws, col, rec.ID)
+	_, err := svc.Get(ctx, ws, col, rec.ID, "tester")
 	e, ok := apierr.As(err)
 	if !ok || e.Code != apierr.NotFound {
 		t.Fatalf("get after delete: %v, want not_found", err)
@@ -197,7 +197,7 @@ func TestDeleteEventCarriesActor(t *testing.T) {
 		t.Fatalf("delete: %v", err)
 	}
 
-	hist, err := svc.History(ctx, ws, col, rec.ID)
+	hist, err := svc.History(ctx, ws, col, rec.ID, "tester")
 	if err != nil {
 		t.Fatalf("history: %v", err)
 	}
@@ -247,7 +247,7 @@ func TestRevertEventCarriesActor(t *testing.T) {
 		t.Fatalf("reverted record actor = %q, want %q", reverted.Actor, revertActor)
 	}
 
-	hist, err := svc.History(ctx, ws, col, rec.ID)
+	hist, err := svc.History(ctx, ws, col, rec.ID, "tester")
 	if err != nil {
 		t.Fatalf("history: %v", err)
 	}

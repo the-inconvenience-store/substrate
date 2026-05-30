@@ -13,8 +13,8 @@ import (
 )
 
 const appendEvent = `-- name: AppendEvent :exec
-INSERT INTO events (id, workspace_id, collection_id, record_id, type, revision, state_after, actor, idempotency_key)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+INSERT INTO events (id, workspace_id, collection_id, record_id, type, revision, state_after, actor, idempotency_key, trace)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 `
 
 type AppendEventParams struct {
@@ -27,6 +27,7 @@ type AppendEventParams struct {
 	StateAfter     []byte      `json:"state_after"`
 	Actor          pgtype.Text `json:"actor"`
 	IdempotencyKey pgtype.Text `json:"idempotency_key"`
+	Trace          []byte      `json:"trace"`
 }
 
 func (q *Queries) AppendEvent(ctx context.Context, arg AppendEventParams) error {
@@ -40,6 +41,7 @@ func (q *Queries) AppendEvent(ctx context.Context, arg AppendEventParams) error 
 		arg.StateAfter,
 		arg.Actor,
 		arg.IdempotencyKey,
+		arg.Trace,
 	)
 	return err
 }
@@ -83,7 +85,7 @@ func (q *Queries) GetReplayEvent(ctx context.Context, arg GetReplayEventParams) 
 const getStateAtEvent = `-- name: GetStateAtEvent :one
 SELECT state_after, revision, type
 FROM events e
-WHERE e.workspace_id = $1 AND e.collection_id = $2 AND e.record_id = $3
+WHERE e.workspace_id = $1 AND e.collection_id = $2 AND e.record_id = $3 AND e.type <> 'policy_denied'
   AND e.seq <= (SELECT sub.seq FROM events sub WHERE sub.id = $4)
 ORDER BY e.seq DESC
 LIMIT 1
@@ -117,7 +119,7 @@ func (q *Queries) GetStateAtEvent(ctx context.Context, arg GetStateAtEventParams
 const getStateAtRevision = `-- name: GetStateAtRevision :one
 SELECT state_after, revision, type
 FROM events
-WHERE workspace_id = $1 AND collection_id = $2 AND record_id = $3 AND revision <= $4
+WHERE workspace_id = $1 AND collection_id = $2 AND record_id = $3 AND revision <= $4 AND type <> 'policy_denied'
 ORDER BY seq DESC
 LIMIT 1
 `
@@ -150,7 +152,7 @@ func (q *Queries) GetStateAtRevision(ctx context.Context, arg GetStateAtRevision
 const getStateAtTimestamp = `-- name: GetStateAtTimestamp :one
 SELECT state_after, revision, type
 FROM events
-WHERE workspace_id = $1 AND collection_id = $2 AND record_id = $3 AND created_at <= $4
+WHERE workspace_id = $1 AND collection_id = $2 AND record_id = $3 AND created_at <= $4 AND type <> 'policy_denied'
 ORDER BY seq DESC
 LIMIT 1
 `
@@ -183,7 +185,7 @@ func (q *Queries) GetStateAtTimestamp(ctx context.Context, arg GetStateAtTimesta
 const listRecordEvents = `-- name: ListRecordEvents :many
 SELECT revision, type, actor, state_after, created_at
 FROM events
-WHERE workspace_id = $1 AND collection_id = $2 AND record_id = $3
+WHERE workspace_id = $1 AND collection_id = $2 AND record_id = $3 AND type <> 'policy_denied'
 ORDER BY seq ASC
 `
 

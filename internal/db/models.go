@@ -43,6 +43,16 @@ type Event struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
+type Policy struct {
+	ID           uuid.UUID          `json:"id"`
+	WorkspaceID  uuid.UUID          `json:"workspace_id"`
+	Actor        string             `json:"actor"`
+	CollectionID pgtype.UUID        `json:"collection_id"`
+	Operation    string             `json:"operation"`
+	Effect       string             `json:"effect"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
 type Record struct {
 	ID            uuid.UUID          `json:"id"`
 	CollectionID  uuid.UUID          `json:"collection_id"`

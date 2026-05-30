@@ -14,6 +14,7 @@ import (
 
 	"github.com/substrate/substrate/internal/apierr"
 	"github.com/substrate/substrate/internal/db"
+	"github.com/substrate/substrate/internal/policy"
 	"github.com/substrate/substrate/internal/store"
 )
 
@@ -53,9 +54,27 @@ type Service struct {
 	pool    *pgxpool.Pool
 	q       *db.Queries
 	indexer Indexer
+	eval    policy.Evaluator
 }
 
 func New(pool *pgxpool.Pool) *Service { return &Service{pool: pool, q: db.New(pool)} }
+
+// WithEvaluator wires an optional policy evaluator. nil ⇒ no enforcement.
+func (s *Service) WithEvaluator(e policy.Evaluator) *Service { s.eval = e; return s }
+
+func (s *Service) authorize(ctx context.Context, req policy.Request) (policy.Decision, error) {
+	if s.eval == nil {
+		return policy.Decision{Effect: "allow", Reason: "no_evaluator"}, nil
+	}
+	return s.eval.Authorize(ctx, req)
+}
+
+func (s *Service) policyTrace(dec policy.Decision, op string) []byte {
+	if s.eval == nil {
+		return nil
+	}
+	return dec.TraceJSON(op)
+}
 
 // NewWithIndexer wires an optional index manager invoked after activations.
 func NewWithIndexer(pool *pgxpool.Pool, ix Indexer) *Service {
@@ -113,6 +132,14 @@ func compileSchema(doc map[string]any) error {
 // Register inserts a new immutable version. First schema auto-activates; otherwise
 // it is a draft unless Activate is set.
 func (s *Service) Register(ctx context.Context, cmd RegisterCmd) (SchemaVersion, error) {
+	dec, err := s.authorize(ctx, policy.Request{
+		Workspace: cmd.Workspace, Actor: cmd.Actor, Collection: cmd.Collection,
+		Target: cmd.Collection, Operation: policy.OpRegisterSchema,
+	})
+	if err != nil {
+		return SchemaVersion{}, err
+	}
+	regTrace := s.policyTrace(dec, policy.OpRegisterSchema)
 	if err := compileSchema(cmd.JSONSchema); err != nil {
 		return SchemaVersion{}, err
 	}
@@ -120,7 +147,7 @@ func (s *Service) Register(ctx context.Context, cmd RegisterCmd) (SchemaVersion,
 	idxRaw, _ := json.Marshal(normStrings(cmd.IndexedFields))
 
 	var result SchemaVersion
-	err := store.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
+	err = store.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
 		qtx := s.q.WithTx(tx)
 		col, err := qtx.LockCollection(ctx, cmd.Collection)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -153,11 +180,11 @@ func (s *Service) Register(ctx context.Context, cmd RegisterCmd) (SchemaVersion,
 		if err != nil {
 			return err
 		}
-		if err := appendSchemaEvent(ctx, qtx, cmd.Collection, col.WorkspaceID, "schema_registered", int64(next), lifecycle, cmd.Actor); err != nil {
+		if err := appendSchemaEvent(ctx, qtx, cmd.Collection, col.WorkspaceID, "schema_registered", int64(next), lifecycle, cmd.Actor, regTrace); err != nil {
 			return err
 		}
 		if lifecycle == "active" {
-			if err := s.activateTx(ctx, qtx, cmd.Collection, col.WorkspaceID, col.ActiveSchemaVersion, next, cmd.Actor); err != nil {
+			if err := s.activateTx(ctx, qtx, cmd.Collection, col.WorkspaceID, col.ActiveSchemaVersion, next, cmd.Actor, regTrace); err != nil {
 				return err
 			}
 		}
@@ -248,7 +275,7 @@ func (s *Service) checkCompatibleTx(ctx context.Context, q *db.Queries, col uuid
 
 // activateTx deprecates the previously-active version, marks the target active,
 // moves the collection pointer, and appends a schema_activated event.
-func (s *Service) activateTx(ctx context.Context, q *db.Queries, col uuid.UUID, ws uuid.UUID, prior pgtype.Int4, version int32, actor string) error {
+func (s *Service) activateTx(ctx context.Context, q *db.Queries, col uuid.UUID, ws uuid.UUID, prior pgtype.Int4, version int32, actor string, trace []byte) error {
 	// Deprecate the previously-active version if any and different.
 	if prior.Valid && prior.Int32 != version {
 		if err := q.SetSchemaLifecycle(ctx, db.SetSchemaLifecycleParams{
@@ -267,11 +294,18 @@ func (s *Service) activateTx(ctx context.Context, q *db.Queries, col uuid.UUID, 
 	}); err != nil {
 		return err
 	}
-	return appendSchemaEvent(ctx, q, col, ws, "schema_activated", int64(version), "active", actor)
+	return appendSchemaEvent(ctx, q, col, ws, "schema_activated", int64(version), "active", actor, trace)
 }
 
 // Activate makes an existing draft/deprecated version the active one.
 func (s *Service) Activate(ctx context.Context, ws, col uuid.UUID, version int, actor string, force bool, rationale string) error {
+	dec, aerr := s.authorize(ctx, policy.Request{
+		Workspace: ws, Actor: actor, Collection: col, Target: col, Operation: policy.OpActivateSchema,
+	})
+	if aerr != nil {
+		return aerr
+	}
+	actTrace := s.policyTrace(dec, policy.OpActivateSchema)
 	if err := store.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
 		qtx := s.q.WithTx(tx)
 		c, err := qtx.LockCollection(ctx, col)
@@ -304,7 +338,7 @@ func (s *Service) Activate(ctx context.Context, ws, col uuid.UUID, version int, 
 				return err
 			}
 		}
-		return s.activateTx(ctx, qtx, col, c.WorkspaceID, c.ActiveSchemaVersion, int32(version), actor)
+		return s.activateTx(ctx, qtx, col, c.WorkspaceID, c.ActiveSchemaVersion, int32(version), actor, actTrace)
 	}); err != nil {
 		return err
 	}
@@ -312,7 +346,14 @@ func (s *Service) Activate(ctx context.Context, ws, col uuid.UUID, version int, 
 }
 
 // Deprecate marks a non-active version deprecated.
-func (s *Service) Deprecate(ctx context.Context, col uuid.UUID, version int) error {
+func (s *Service) Deprecate(ctx context.Context, ws, col uuid.UUID, version int, actor string) error {
+	dec, aerr := s.authorize(ctx, policy.Request{
+		Workspace: ws, Actor: actor, Collection: col, Target: col, Operation: policy.OpDeprecateSchema,
+	})
+	if aerr != nil {
+		return aerr
+	}
+	depTrace := s.policyTrace(dec, policy.OpDeprecateSchema)
 	return store.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
 		qtx := s.q.WithTx(tx)
 		c, err := qtx.LockCollection(ctx, col)
@@ -330,19 +371,19 @@ func (s *Service) Deprecate(ctx context.Context, col uuid.UUID, version int) err
 		}); err != nil {
 			return err
 		}
-		return appendSchemaEvent(ctx, qtx, col, c.WorkspaceID, "schema_deprecated", int64(version), "deprecated", "")
+		return appendSchemaEvent(ctx, qtx, col, c.WorkspaceID, "schema_deprecated", int64(version), "deprecated", actor, depTrace)
 	})
 }
 
 // appendSchemaEvent records a schema lifecycle change on the events timeline.
 // The event is collection-scoped: record_id is the collection id; revision is the schema version.
 // state_after is written as {"version":<n>,"lifecycle":"<lifecycle>"}.
-func appendSchemaEvent(ctx context.Context, q *db.Queries, col uuid.UUID, ws uuid.UUID, typ string, version int64, lifecycle string, actor string) error {
+func appendSchemaEvent(ctx context.Context, q *db.Queries, col uuid.UUID, ws uuid.UUID, typ string, version int64, lifecycle string, actor string, trace []byte) error {
 	stateAfter, _ := json.Marshal(map[string]any{"version": version, "lifecycle": lifecycle})
 	return q.AppendEvent(ctx, db.AppendEventParams{
 		ID: uuid.New(), WorkspaceID: ws, CollectionID: col, RecordID: col,
 		Type: typ, Revision: version, StateAfter: stateAfter,
-		Actor: textOrNull(actor), IdempotencyKey: textOrNull(""),
+		Actor: textOrNull(actor), IdempotencyKey: textOrNull(""), Trace: trace,
 	})
 }
 
