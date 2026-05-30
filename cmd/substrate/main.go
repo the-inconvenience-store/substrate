@@ -9,8 +9,10 @@ import (
 	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
 
 	"github.com/substrate/substrate/internal/api"
+	"github.com/substrate/substrate/internal/audit"
 	"github.com/substrate/substrate/internal/collection"
 	"github.com/substrate/substrate/internal/config"
+	"github.com/substrate/substrate/internal/policy"
 	"github.com/substrate/substrate/internal/query"
 	"github.com/substrate/substrate/internal/record"
 	"github.com/substrate/substrate/internal/schema"
@@ -52,11 +54,16 @@ func main() {
 	}
 
 	schemaReg := schema.NewWithIndexer(pool, query.NewIndexer(pool))
+	engine := policy.NewEngine(pool)
+	schemaReg.WithEvaluator(engine)
+
 	router := api.NewRouter(api.Deps{
 		Workspaces:  workspace.New(pool),
 		Collections: collection.New(pool),
-		Records:     record.New(pool, schema.NewValidator(schemaReg)),
+		Records:     record.New(pool, schema.NewValidator(schemaReg)).WithEvaluator(engine),
 		Schemas:     schemaReg,
+		Policies:    policy.NewService(pool),
+		Audit:       audit.New(pool),
 		AdminToken:  cfg.AdminToken,
 	})
 
