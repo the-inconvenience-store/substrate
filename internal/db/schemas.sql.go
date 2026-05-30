@@ -166,7 +166,7 @@ func (q *Queries) ListSchemas(ctx context.Context, collectionID uuid.UUID) ([]Li
 }
 
 const lockCollection = `-- name: LockCollection :one
-SELECT id, level, active_schema_version
+SELECT id, workspace_id, level, active_schema_version
 FROM collections
 WHERE id = $1
 FOR UPDATE
@@ -174,6 +174,7 @@ FOR UPDATE
 
 type LockCollectionRow struct {
 	ID                  uuid.UUID   `json:"id"`
+	WorkspaceID         uuid.UUID   `json:"workspace_id"`
 	Level               string      `json:"level"`
 	ActiveSchemaVersion pgtype.Int4 `json:"active_schema_version"`
 }
@@ -181,7 +182,12 @@ type LockCollectionRow struct {
 func (q *Queries) LockCollection(ctx context.Context, id uuid.UUID) (LockCollectionRow, error) {
 	row := q.db.QueryRow(ctx, lockCollection, id)
 	var i LockCollectionRow
-	err := row.Scan(&i.ID, &i.Level, &i.ActiveSchemaVersion)
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.Level,
+		&i.ActiveSchemaVersion,
+	)
 	return i, err
 }
 

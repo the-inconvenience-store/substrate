@@ -1,5 +1,5 @@
 -- name: LockCollection :one
-SELECT id, level, active_schema_version
+SELECT id, workspace_id, level, active_schema_version
 FROM collections
 WHERE id = $1
 FOR UPDATE;

@@ -123,7 +123,7 @@ func (s *Service) Register(ctx context.Context, cmd RegisterCmd) (SchemaVersion,
 			return err
 		}
 		if lifecycle == "active" {
-			if err := s.activateTx(ctx, qtx, cmd.Collection, col.ActiveSchemaVersion, next, cmd.Actor); err != nil {
+			if err := s.activateTx(ctx, qtx, cmd.Collection, col.WorkspaceID, col.ActiveSchemaVersion, next, cmd.Actor); err != nil {
 				return err
 			}
 		}
@@ -179,17 +179,117 @@ func (s *Service) List(ctx context.Context, col uuid.UUID) ([]SchemaVersion, err
 	return out, nil
 }
 
-// --- Task 3 stubs (replaced by Task 4) ---
-
-// activateTx sets the collection's active schema version.
-// Task 4 replaces this with the full implementation: deprecate prior + write schema_activated event.
-func (s *Service) activateTx(ctx context.Context, q *db.Queries, col uuid.UUID, prior pgtype.Int4, version int32, actor string) error {
-	return q.SetCollectionActiveVersion(ctx, db.SetCollectionActiveVersionParams{ID: col, ActiveSchemaVersion: pgtype.Int4{Int32: version, Valid: true}})
+// checkCompatibleTx loads the prior active schema and runs Classify. Returns
+// schema_incompatible if any breaking change is detected (unless force is true).
+func (s *Service) checkCompatibleTx(ctx context.Context, q *db.Queries, col uuid.UUID, priorVersion int32, candidate map[string]any, force bool) error {
+	if force {
+		return nil
+	}
+	prior, err := q.GetSchema(ctx, db.GetSchemaParams{CollectionID: col, Version: priorVersion})
+	if err != nil {
+		return fmt.Errorf("load prior schema: %w", err)
+	}
+	var priorDoc map[string]any
+	if err := json.Unmarshal(prior.JsonSchema, &priorDoc); err != nil {
+		return fmt.Errorf("decode prior schema: %w", err)
+	}
+	changes := Classify(priorDoc, candidate)
+	var breaking []Change
+	for _, c := range changes {
+		if c.Breaking {
+			breaking = append(breaking, c)
+		}
+	}
+	if len(breaking) > 0 {
+		return apierr.New(apierr.SchemaIncompatible, "breaking schema change requires force").
+			WithDetails(map[string]any{"breaking_changes": breaking})
+	}
+	return nil
 }
 
-// checkCompatibleTx is a no-op stub; Task 4 implements the real compatibility gate.
-func (s *Service) checkCompatibleTx(ctx context.Context, q *db.Queries, col uuid.UUID, priorVersion int32, candidate map[string]any, force bool) error {
-	return nil // Task 4 implements the real compatibility gate
+// activateTx deprecates the previously-active version, marks the target active,
+// moves the collection pointer, and appends a schema_activated event.
+func (s *Service) activateTx(ctx context.Context, q *db.Queries, col uuid.UUID, ws uuid.UUID, prior pgtype.Int4, version int32, actor string) error {
+	// Deprecate the previously-active version if any and different.
+	if prior.Valid && prior.Int32 != version {
+		if err := q.SetSchemaLifecycle(ctx, db.SetSchemaLifecycleParams{
+			CollectionID: col, Version: prior.Int32, Lifecycle: "deprecated",
+		}); err != nil {
+			return err
+		}
+	}
+	if err := q.SetSchemaLifecycle(ctx, db.SetSchemaLifecycleParams{
+		CollectionID: col, Version: version, Lifecycle: "active",
+	}); err != nil {
+		return err
+	}
+	if err := q.SetCollectionActiveVersion(ctx, db.SetCollectionActiveVersionParams{
+		ID: col, ActiveSchemaVersion: pgtype.Int4{Int32: version, Valid: true},
+	}); err != nil {
+		return err
+	}
+	return appendSchemaEvent(ctx, q, col, ws, "schema_activated", int64(version), actor)
+}
+
+// Activate makes an existing draft/deprecated version the active one.
+func (s *Service) Activate(ctx context.Context, ws, col uuid.UUID, version int, actor string, force bool, rationale string) error {
+	return store.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
+		qtx := s.q.WithTx(tx)
+		c, err := qtx.LockCollection(ctx, col)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apierr.New(apierr.NotFound, "collection not found")
+		}
+		if err != nil {
+			return err
+		}
+		target, err := qtx.GetSchema(ctx, db.GetSchemaParams{CollectionID: col, Version: int32(version)})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apierr.New(apierr.NotFound, "schema version not found")
+		}
+		if err != nil {
+			return err
+		}
+		if c.ActiveSchemaVersion.Valid && c.ActiveSchemaVersion.Int32 != int32(version) {
+			var candidate map[string]any
+			if err := json.Unmarshal(target.JsonSchema, &candidate); err != nil {
+				return fmt.Errorf("decode candidate: %w", err)
+			}
+			if err := s.checkCompatibleTx(ctx, qtx, col, c.ActiveSchemaVersion.Int32, candidate, force); err != nil {
+				return err
+			}
+		}
+		return s.activateTx(ctx, qtx, col, c.WorkspaceID, c.ActiveSchemaVersion, int32(version), actor)
+	})
+}
+
+// Deprecate marks a non-active version deprecated.
+func (s *Service) Deprecate(ctx context.Context, col uuid.UUID, version int) error {
+	return store.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
+		qtx := s.q.WithTx(tx)
+		c, err := qtx.LockCollection(ctx, col)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apierr.New(apierr.NotFound, "collection not found")
+		}
+		if err != nil {
+			return err
+		}
+		if c.ActiveSchemaVersion.Valid && c.ActiveSchemaVersion.Int32 == int32(version) {
+			return apierr.New(apierr.Conflict, "cannot deprecate the active version; activate another first")
+		}
+		return qtx.SetSchemaLifecycle(ctx, db.SetSchemaLifecycleParams{
+			CollectionID: col, Version: int32(version), Lifecycle: "deprecated",
+		})
+	})
+}
+
+// appendSchemaEvent records a schema lifecycle change on the events timeline.
+// The event is collection-scoped: record_id is the collection id; revision is the schema version.
+func appendSchemaEvent(ctx context.Context, q *db.Queries, col uuid.UUID, ws uuid.UUID, typ string, version int64, actor string) error {
+	return q.AppendEvent(ctx, db.AppendEventParams{
+		ID: uuid.New(), WorkspaceID: ws, CollectionID: col, RecordID: col,
+		Type: typ, Revision: version, StateAfter: []byte("{}"),
+		Actor: textOrNull(actor), IdempotencyKey: textOrNull(""),
+	})
 }
 
 // --- helpers ---
