@@ -31,7 +31,7 @@ run = "go run ./cmd/substrate"
 
 [tasks."bench:pure"]
 description = "Run pure-logic micro-benchmarks (no Docker)"
-run = "go test -run '^$' -bench . -benchmem -count=10 ./internal/policy/... ./internal/query/... ./internal/schema/... ./internal/projection/..."
+run = "go test -run '^$' -bench . -benchmem -count=10 ./internal/policy/... ./internal/query/... ./internal/schema/... ./internal/projection/... ./internal/jsonx/..."
 
 [tasks."bench:db"]
 description = "Run DB-backed record benchmarks (requires Docker)"
@@ -54,7 +54,7 @@ out="docs/benchmarks/runs/$(date +%Y%m%dT%H%M%S).txt"
 [tasks."bench:baseline"]
 description = "Refresh committed baselines (overwrites docs/benchmarks/baseline/*.txt)"
 run = [
-  "go test -run '^$' -bench . -benchmem -count=10 ./internal/policy/... ./internal/query/... ./internal/schema/... ./internal/projection/... | tee docs/benchmarks/baseline/pure.txt",
+  "go test -run '^$' -bench . -benchmem -count=10 ./internal/policy/... ./internal/query/... ./internal/schema/... ./internal/projection/... ./internal/jsonx/... | tee docs/benchmarks/baseline/pure.txt",
   "go test -tags=integration -run '^$' -bench . -benchmem -count=10 ./internal/record/... | tee docs/benchmarks/baseline/db.txt",
   "go test -tags=integration -run '^$' -bench . -benchmem -count=10 ./internal/api/... | tee docs/benchmarks/baseline/http.txt",
 ]
