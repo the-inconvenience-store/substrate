@@ -132,7 +132,11 @@ func classifyRequired(cur, cand any, path string, out *[]Change) {
 	}
 	for f := range curSet {
 		if !candSet[f] {
-			*out = append(*out, Change{Path: path + ".required." + f, Kind: "remove-required", Breaking: true})
+			// Removing a field from required while keeping the property definition
+			// is a constraint relaxation (non-breaking). If the property itself is
+			// also removed from candidate.properties that is caught separately in
+			// classifyProperties as a breaking "remove-required-field" change.
+			*out = append(*out, Change{Path: path + ".required." + f, Kind: "relax-required", Breaking: false})
 		}
 	}
 }
@@ -140,12 +144,17 @@ func classifyRequired(cur, cand any, path string, out *[]Change) {
 func classifyProperties(cur, cand map[string]any, path string, out *[]Change) {
 	curProps, _ := cur["properties"].(map[string]any)
 	candProps, _ := cand["properties"].(map[string]any)
+	curRequired := strSet(cur["required"])
 	candRequired := strSet(cand["required"])
 	for name, cp := range curProps {
 		np, ok := candProps[name]
 		if !ok {
-			// property dropped from schema: only breaking if it was required (caught by required diff);
-			// dropping an optional property definition is not breaking.
+			// Property dropped from candidate. If it was required in current it
+			// is a breaking removal; dropping an optional property definition is
+			// not breaking.
+			if curRequired[name] {
+				*out = append(*out, Change{Path: path + "." + name, Kind: "remove-required-field", Breaking: true})
+			}
 			continue
 		}
 		cpm, _ := cp.(map[string]any)

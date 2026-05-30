@@ -89,14 +89,33 @@ func TestClassify_RemoveEnumValue_Breaking(t *testing.T) {
 }
 
 func TestClassify_NestedRemoveRequired_Breaking(t *testing.T) {
+	// "x" is removed from both properties and required in the nested object.
+	// Removing a required property entirely (case 2) must be breaking.
 	cur := obj(map[string]any{
 		"a": obj(map[string]any{"x": map[string]any{"type": "string"}}, "x"),
 	}, "a")
 	cand := obj(map[string]any{
-		"a": obj(map[string]any{"x": map[string]any{"type": "string"}}),
+		"a": obj(map[string]any{} /* x removed from properties */),
 	}, "a")
 	if !hasBreaking(Classify(cur, cand)) {
-		t.Fatal("nested required removal must be breaking")
+		t.Fatal("nested removal of a required property must be breaking")
+	}
+}
+
+func TestClassify_RelaxRequiredKeepingProperty_NotBreaking(t *testing.T) {
+	// "b" stays in properties but is removed from required — a constraint
+	// relaxation. Data that previously omitted "b" now validates; data that
+	// included "b" still validates. This must NOT be breaking.
+	cur := obj(map[string]any{
+		"a": map[string]any{"type": "string"},
+		"b": map[string]any{"type": "string"},
+	}, "a", "b")
+	cand := obj(map[string]any{
+		"a": map[string]any{"type": "string"},
+		"b": map[string]any{"type": "string"},
+	}, "a") // b kept as property, just no longer required
+	if hasBreaking(Classify(cur, cand)) {
+		t.Fatal("removing a field from required while keeping the property definition must not be breaking")
 	}
 }
 
