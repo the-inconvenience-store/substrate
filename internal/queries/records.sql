@@ -26,3 +26,13 @@ WHERE workspace_id = $1 AND collection_id = $2 AND id = $3;
 -- name: SoftDeleteRecord :exec
 UPDATE records SET status = 'deleted', revision = $4, updated_at = now()
 WHERE workspace_id = $1 AND collection_id = $2 AND id = $3;
+
+-- name: GetAnyRecordRevisionForUpdate :one
+SELECT revision
+FROM records
+WHERE workspace_id = $1 AND collection_id = $2 AND id = $3
+FOR UPDATE;
+
+-- name: RevertRecordData :exec
+UPDATE records SET data = $4, revision = $5, status = 'active', updated_at = now()
+WHERE workspace_id = $1 AND collection_id = $2 AND id = $3;

@@ -79,3 +79,150 @@ func (q *Queries) GetReplayEvent(ctx context.Context, arg GetReplayEventParams) 
 	)
 	return i, err
 }
+
+const getStateAtEvent = `-- name: GetStateAtEvent :one
+SELECT state_after, revision, type
+FROM events e
+WHERE e.workspace_id = $1 AND e.collection_id = $2 AND e.record_id = $3
+  AND e.seq <= (SELECT sub.seq FROM events sub WHERE sub.id = $4)
+ORDER BY e.seq DESC
+LIMIT 1
+`
+
+type GetStateAtEventParams struct {
+	WorkspaceID  uuid.UUID `json:"workspace_id"`
+	CollectionID uuid.UUID `json:"collection_id"`
+	RecordID     uuid.UUID `json:"record_id"`
+	ID           uuid.UUID `json:"id"`
+}
+
+type GetStateAtEventRow struct {
+	StateAfter []byte `json:"state_after"`
+	Revision   int64  `json:"revision"`
+	Type       string `json:"type"`
+}
+
+func (q *Queries) GetStateAtEvent(ctx context.Context, arg GetStateAtEventParams) (GetStateAtEventRow, error) {
+	row := q.db.QueryRow(ctx, getStateAtEvent,
+		arg.WorkspaceID,
+		arg.CollectionID,
+		arg.RecordID,
+		arg.ID,
+	)
+	var i GetStateAtEventRow
+	err := row.Scan(&i.StateAfter, &i.Revision, &i.Type)
+	return i, err
+}
+
+const getStateAtRevision = `-- name: GetStateAtRevision :one
+SELECT state_after, revision, type
+FROM events
+WHERE workspace_id = $1 AND collection_id = $2 AND record_id = $3 AND revision <= $4
+ORDER BY seq DESC
+LIMIT 1
+`
+
+type GetStateAtRevisionParams struct {
+	WorkspaceID  uuid.UUID `json:"workspace_id"`
+	CollectionID uuid.UUID `json:"collection_id"`
+	RecordID     uuid.UUID `json:"record_id"`
+	Revision     int64     `json:"revision"`
+}
+
+type GetStateAtRevisionRow struct {
+	StateAfter []byte `json:"state_after"`
+	Revision   int64  `json:"revision"`
+	Type       string `json:"type"`
+}
+
+func (q *Queries) GetStateAtRevision(ctx context.Context, arg GetStateAtRevisionParams) (GetStateAtRevisionRow, error) {
+	row := q.db.QueryRow(ctx, getStateAtRevision,
+		arg.WorkspaceID,
+		arg.CollectionID,
+		arg.RecordID,
+		arg.Revision,
+	)
+	var i GetStateAtRevisionRow
+	err := row.Scan(&i.StateAfter, &i.Revision, &i.Type)
+	return i, err
+}
+
+const getStateAtTimestamp = `-- name: GetStateAtTimestamp :one
+SELECT state_after, revision, type
+FROM events
+WHERE workspace_id = $1 AND collection_id = $2 AND record_id = $3 AND created_at <= $4
+ORDER BY seq DESC
+LIMIT 1
+`
+
+type GetStateAtTimestampParams struct {
+	WorkspaceID  uuid.UUID          `json:"workspace_id"`
+	CollectionID uuid.UUID          `json:"collection_id"`
+	RecordID     uuid.UUID          `json:"record_id"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
+type GetStateAtTimestampRow struct {
+	StateAfter []byte `json:"state_after"`
+	Revision   int64  `json:"revision"`
+	Type       string `json:"type"`
+}
+
+func (q *Queries) GetStateAtTimestamp(ctx context.Context, arg GetStateAtTimestampParams) (GetStateAtTimestampRow, error) {
+	row := q.db.QueryRow(ctx, getStateAtTimestamp,
+		arg.WorkspaceID,
+		arg.CollectionID,
+		arg.RecordID,
+		arg.CreatedAt,
+	)
+	var i GetStateAtTimestampRow
+	err := row.Scan(&i.StateAfter, &i.Revision, &i.Type)
+	return i, err
+}
+
+const listRecordEvents = `-- name: ListRecordEvents :many
+SELECT revision, type, actor, state_after, created_at
+FROM events
+WHERE workspace_id = $1 AND collection_id = $2 AND record_id = $3
+ORDER BY seq ASC
+`
+
+type ListRecordEventsParams struct {
+	WorkspaceID  uuid.UUID `json:"workspace_id"`
+	CollectionID uuid.UUID `json:"collection_id"`
+	RecordID     uuid.UUID `json:"record_id"`
+}
+
+type ListRecordEventsRow struct {
+	Revision   int64              `json:"revision"`
+	Type       string             `json:"type"`
+	Actor      pgtype.Text        `json:"actor"`
+	StateAfter []byte             `json:"state_after"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) ListRecordEvents(ctx context.Context, arg ListRecordEventsParams) ([]ListRecordEventsRow, error) {
+	rows, err := q.db.Query(ctx, listRecordEvents, arg.WorkspaceID, arg.CollectionID, arg.RecordID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListRecordEventsRow
+	for rows.Next() {
+		var i ListRecordEventsRow
+		if err := rows.Scan(
+			&i.Revision,
+			&i.Type,
+			&i.Actor,
+			&i.StateAfter,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

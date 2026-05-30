@@ -47,6 +47,26 @@ func (q *Queries) GetActiveRecord(ctx context.Context, arg GetActiveRecordParams
 	return i, err
 }
 
+const getAnyRecordRevisionForUpdate = `-- name: GetAnyRecordRevisionForUpdate :one
+SELECT revision
+FROM records
+WHERE workspace_id = $1 AND collection_id = $2 AND id = $3
+FOR UPDATE
+`
+
+type GetAnyRecordRevisionForUpdateParams struct {
+	WorkspaceID  uuid.UUID `json:"workspace_id"`
+	CollectionID uuid.UUID `json:"collection_id"`
+	ID           uuid.UUID `json:"id"`
+}
+
+func (q *Queries) GetAnyRecordRevisionForUpdate(ctx context.Context, arg GetAnyRecordRevisionForUpdateParams) (int64, error) {
+	row := q.db.QueryRow(ctx, getAnyRecordRevisionForUpdate, arg.WorkspaceID, arg.CollectionID, arg.ID)
+	var revision int64
+	err := row.Scan(&revision)
+	return revision, err
+}
+
 const getRecordForUpdate = `-- name: GetRecordForUpdate :one
 SELECT revision, data
 FROM records
@@ -114,6 +134,30 @@ func (q *Queries) InsertRecord(ctx context.Context, arg InsertRecordParams) erro
 		arg.Data,
 		arg.Revision,
 		arg.Actor,
+	)
+	return err
+}
+
+const revertRecordData = `-- name: RevertRecordData :exec
+UPDATE records SET data = $4, revision = $5, status = 'active', updated_at = now()
+WHERE workspace_id = $1 AND collection_id = $2 AND id = $3
+`
+
+type RevertRecordDataParams struct {
+	WorkspaceID  uuid.UUID `json:"workspace_id"`
+	CollectionID uuid.UUID `json:"collection_id"`
+	ID           uuid.UUID `json:"id"`
+	Data         []byte    `json:"data"`
+	Revision     int64     `json:"revision"`
+}
+
+func (q *Queries) RevertRecordData(ctx context.Context, arg RevertRecordDataParams) error {
+	_, err := q.db.Exec(ctx, revertRecordData,
+		arg.WorkspaceID,
+		arg.CollectionID,
+		arg.ID,
+		arg.Data,
+		arg.Revision,
 	)
 	return err
 }
