@@ -47,6 +47,7 @@ nested-boolean query; OPA/external policy engines (interface seam only).
 | 7 | Schema evolution | Versioned coexistence + read-time resolution + optional background backfill. Deterministic compatibility classifier; breaking changes gated behind `force`. |
 | 8 | Event/record relationship | Events are authoritative append-only history; the `records` row is a projection maintained **in the same transaction** as the event append. |
 | 9 | Time-travel | Each event stores full `state_after` snapshot → history walk, point-in-time read, and forward-only revert. |
+| 10 | Migrations & query codegen | [goose](https://github.com/pressly/goose) for embedded schema migrations (run programmatically at startup) + [sqlc](https://sqlc.dev) for type-safe query code (`sql_package: pgx/v5`). Services call generated methods rather than inline SQL strings. Both pinned as `go tool` deps. |
 
 ## 3. Architecture
 
