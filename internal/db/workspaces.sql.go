@@ -52,3 +52,28 @@ func (q *Queries) GetWorkspace(ctx context.Context, id uuid.UUID) (Workspace, er
 	)
 	return i, err
 }
+
+const getWorkspacePolicyMode = `-- name: GetWorkspacePolicyMode :one
+SELECT policy_mode FROM workspaces WHERE id = $1
+`
+
+func (q *Queries) GetWorkspacePolicyMode(ctx context.Context, id uuid.UUID) (string, error) {
+	row := q.db.QueryRow(ctx, getWorkspacePolicyMode, id)
+	var policy_mode string
+	err := row.Scan(&policy_mode)
+	return policy_mode, err
+}
+
+const setWorkspacePolicyMode = `-- name: SetWorkspacePolicyMode :exec
+UPDATE workspaces SET policy_mode = $2 WHERE id = $1
+`
+
+type SetWorkspacePolicyModeParams struct {
+	ID         uuid.UUID `json:"id"`
+	PolicyMode string    `json:"policy_mode"`
+}
+
+func (q *Queries) SetWorkspacePolicyMode(ctx context.Context, arg SetWorkspacePolicyModeParams) error {
+	_, err := q.db.Exec(ctx, setWorkspacePolicyMode, arg.ID, arg.PolicyMode)
+	return err
+}

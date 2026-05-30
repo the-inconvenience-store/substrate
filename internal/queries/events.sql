@@ -1,6 +1,6 @@
 -- name: AppendEvent :exec
-INSERT INTO events (id, workspace_id, collection_id, record_id, type, revision, state_after, actor, idempotency_key)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
+INSERT INTO events (id, workspace_id, collection_id, record_id, type, revision, state_after, actor, idempotency_key, trace)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
 
 -- name: GetReplayEvent :one
 SELECT record_id, collection_id, revision, state_after, actor, type

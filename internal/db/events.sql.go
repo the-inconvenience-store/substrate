@@ -13,8 +13,8 @@ import (
 )
 
 const appendEvent = `-- name: AppendEvent :exec
-INSERT INTO events (id, workspace_id, collection_id, record_id, type, revision, state_after, actor, idempotency_key)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+INSERT INTO events (id, workspace_id, collection_id, record_id, type, revision, state_after, actor, idempotency_key, trace)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 `
 
 type AppendEventParams struct {
@@ -27,6 +27,7 @@ type AppendEventParams struct {
 	StateAfter     []byte      `json:"state_after"`
 	Actor          pgtype.Text `json:"actor"`
 	IdempotencyKey pgtype.Text `json:"idempotency_key"`
+	Trace          []byte      `json:"trace"`
 }
 
 func (q *Queries) AppendEvent(ctx context.Context, arg AppendEventParams) error {
@@ -40,6 +41,7 @@ func (q *Queries) AppendEvent(ctx context.Context, arg AppendEventParams) error 
 		arg.StateAfter,
 		arg.Actor,
 		arg.IdempotencyKey,
+		arg.Trace,
 	)
 	return err
 }
