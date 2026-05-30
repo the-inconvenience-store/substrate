@@ -972,7 +972,32 @@ func TestCreateAndVerifyKey(t *testing.T) {
 Run: `go test -tags=integration ./internal/workspace/...`
 Expected: FAIL — `undefined: New`.
 
-- [ ] **Step 3: Implement workspaces + keys**
+- [ ] **Step 3: Add the api_keys queries and regenerate sqlc**
+
+The `CreateWorkspace` and `GetWorkspace` queries already exist (Task 2). Add the API-key
+queries. Create `internal/queries/api_keys.sql`:
+```sql
+-- name: CreateAPIKey :one
+INSERT INTO api_keys (id, workspace_id, hash, label)
+VALUES ($1, $2, $3, $4)
+RETURNING id;
+
+-- name: GetWorkspaceIDByAPIKeyHash :one
+SELECT workspace_id
+FROM api_keys
+WHERE hash = $1 AND revoked_at IS NULL;
+```
+Regenerate and build:
+```bash
+go tool sqlc generate
+go build ./...
+```
+This adds `CreateAPIKey(ctx, CreateAPIKeyParams) (uuid.UUID, error)` and
+`GetWorkspaceIDByAPIKeyHash(ctx, []byte) (uuid.UUID, error)` to `internal/db`.
+`CreateAPIKeyParams` has `ID uuid.UUID`, `WorkspaceID uuid.UUID`, `Hash []byte`,
+`Label pgtype.Text` (nullable column). Check the generated names and match them if different.
+
+- [ ] **Step 4: Implement the workspace service over the generated queries**
 
 Create `internal/workspace/workspace.go`:
 ```go
@@ -983,13 +1008,16 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/substrate/substrate/internal/apierr"
+	"github.com/substrate/substrate/internal/db"
 )
 
 // Workspace is a tenant boundary.
@@ -1000,19 +1028,21 @@ type Workspace struct {
 }
 
 // Service manages workspaces and their API keys.
-type Service struct{ pool *pgxpool.Pool }
+type Service struct {
+	pool *pgxpool.Pool
+	q    *db.Queries
+}
 
-func New(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
+func New(pool *pgxpool.Pool) *Service { return &Service{pool: pool, q: db.New(pool)} }
 
 func (s *Service) CreateWorkspace(ctx context.Context, name string) (Workspace, error) {
-	ws := Workspace{ID: uuid.New(), Name: name, PolicyMode: "allow"}
-	_, err := s.pool.Exec(ctx,
-		`INSERT INTO workspaces(id, name, policy_mode) VALUES($1,$2,$3)`,
-		ws.ID, ws.Name, ws.PolicyMode)
+	row, err := s.q.CreateWorkspace(ctx, db.CreateWorkspaceParams{
+		ID: uuid.New(), Name: name, PolicyMode: "allow",
+	})
 	if err != nil {
 		return Workspace{}, fmt.Errorf("insert workspace: %w", err)
 	}
-	return ws, nil
+	return Workspace{ID: row.ID, Name: row.Name, PolicyMode: row.PolicyMode}, nil
 }
 
 // CreateAPIKey returns the plaintext key (shown once) and the stored key id.
@@ -1023,10 +1053,12 @@ func (s *Service) CreateAPIKey(ctx context.Context, ws uuid.UUID, label string) 
 	}
 	plaintext := "sk_" + base64.RawURLEncoding.EncodeToString(raw)
 	sum := sha256.Sum256([]byte(plaintext))
-	id := uuid.New()
-	_, err := s.pool.Exec(ctx,
-		`INSERT INTO api_keys(id, workspace_id, hash, label) VALUES($1,$2,$3,$4)`,
-		id, ws, sum[:], label)
+	id, err := s.q.CreateAPIKey(ctx, db.CreateAPIKeyParams{
+		ID:          uuid.New(),
+		WorkspaceID: ws,
+		Hash:        sum[:],
+		Label:       pgtype.Text{String: label, Valid: label != ""},
+	})
 	if err != nil {
 		return "", uuid.Nil, fmt.Errorf("insert key: %w", err)
 	}
@@ -1036,11 +1068,8 @@ func (s *Service) CreateAPIKey(ctx context.Context, ws uuid.UUID, label string) 
 // VerifyKey resolves a plaintext key to its workspace, or returns an Unauthorized error.
 func (s *Service) VerifyKey(ctx context.Context, plaintext string) (uuid.UUID, error) {
 	sum := sha256.Sum256([]byte(plaintext))
-	var ws uuid.UUID
-	err := s.pool.QueryRow(ctx,
-		`SELECT workspace_id FROM api_keys WHERE hash=$1 AND revoked_at IS NULL`,
-		sum[:]).Scan(&ws)
-	if err == pgx.ErrNoRows {
+	ws, err := s.q.GetWorkspaceIDByAPIKeyHash(ctx, sum[:])
+	if errors.Is(err, pgx.ErrNoRows) {
 		return uuid.Nil, apierr.New(apierr.Unauthorized, "invalid api key")
 	}
 	if err != nil {
@@ -1050,16 +1079,21 @@ func (s *Service) VerifyKey(ctx context.Context, plaintext string) (uuid.UUID, e
 }
 ```
 
-- [ ] **Step 4: Run the test to confirm it passes**
+> The `CreateAPIKey` generated query returns the new `id`. Note we generate the UUID in Go
+> (`uuid.New()`) and pass it in, matching the `CreateWorkspace` pattern. If you prefer, inline
+> `ID: uuid.New()` directly instead of the `id_or_new()` helper — either is fine, just keep it
+> readable.
 
-Run: `go test -tags=integration ./internal/workspace/...`
+- [ ] **Step 5: Run the test to confirm it passes**
+
+Run: `go test -tags=integration -timeout 300s ./internal/workspace/...`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add internal/workspace
-git commit -m "feat: workspace and api-key service"
+git add internal/queries internal/db internal/workspace
+git commit -m "feat: workspace and api-key service (sqlc)"
 ```
 
 ---
