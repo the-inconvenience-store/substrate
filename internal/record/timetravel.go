@@ -110,7 +110,8 @@ func (s *Service) Revert(ctx context.Context, ws, col, id uuid.UUID, to AsOf, ac
 		if err := appendEvent(ctx, qtx, eventRow{
 			Workspace: ws, Collection: col, RecordID: id,
 			Type: "revert", Revision: next, State: state, Actor: actor,
-			Trace: s.policyTrace(dec, policy.OpUpdate),
+			Trace:         s.policyTrace(dec, policy.OpUpdate),
+			SchemaVersion: pgtype.Int4{},
 		}); err != nil {
 			return err
 		}
