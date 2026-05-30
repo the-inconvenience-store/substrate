@@ -43,13 +43,51 @@ type ActiveSchema struct {
 	Raw     []byte
 }
 
+// Indexer ensures the expression indexes backing a version's indexed_fields.
+type Indexer interface {
+	EnsureCollectionIndexes(ctx context.Context, collectionID uuid.UUID, fields []string) error
+}
+
 // Service manages the schema registry.
 type Service struct {
-	pool *pgxpool.Pool
-	q    *db.Queries
+	pool    *pgxpool.Pool
+	q       *db.Queries
+	indexer Indexer
 }
 
 func New(pool *pgxpool.Pool) *Service { return &Service{pool: pool, q: db.New(pool)} }
+
+// NewWithIndexer wires an optional index manager invoked after activations.
+func NewWithIndexer(pool *pgxpool.Pool, ix Indexer) *Service {
+	s := New(pool)
+	s.indexer = ix
+	return s
+}
+
+// ensureActiveIndexes loads the collection's active version and ensures the
+// expression indexes backing its indexed_fields exist. Runs post-commit.
+func (s *Service) ensureActiveIndexes(ctx context.Context, col uuid.UUID) error {
+	if s.indexer == nil {
+		return nil
+	}
+	active, err := s.q.GetActiveSchema(ctx, col)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("load active for indexing: %w", err)
+	}
+	full, err := s.q.GetSchema(ctx, db.GetSchemaParams{CollectionID: col, Version: active.Version})
+	if err != nil {
+		return fmt.Errorf("load active version for indexing: %w", err)
+	}
+	var fields []string
+	_ = json.Unmarshal(full.IndexedFields, &fields)
+	if len(fields) == 0 {
+		return nil
+	}
+	return s.indexer.EnsureCollectionIndexes(ctx, col, fields)
+}
 
 // compileSchema validates that doc is a usable JSON Schema (draft 2020-12).
 func compileSchema(doc map[string]any) error {
@@ -128,6 +166,11 @@ func (s *Service) Register(ctx context.Context, cmd RegisterCmd) (SchemaVersion,
 	})
 	if err != nil {
 		return SchemaVersion{}, err
+	}
+	if result.Lifecycle == "active" {
+		if ierr := s.ensureActiveIndexes(ctx, cmd.Collection); ierr != nil {
+			return SchemaVersion{}, ierr
+		}
 	}
 	return result, nil
 }
@@ -229,7 +272,7 @@ func (s *Service) activateTx(ctx context.Context, q *db.Queries, col uuid.UUID, 
 
 // Activate makes an existing draft/deprecated version the active one.
 func (s *Service) Activate(ctx context.Context, ws, col uuid.UUID, version int, actor string, force bool, rationale string) error {
-	return store.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
+	if err := store.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
 		qtx := s.q.WithTx(tx)
 		c, err := qtx.LockCollection(ctx, col)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -262,7 +305,10 @@ func (s *Service) Activate(ctx context.Context, ws, col uuid.UUID, version int, 
 			}
 		}
 		return s.activateTx(ctx, qtx, col, c.WorkspaceID, c.ActiveSchemaVersion, int32(version), actor)
-	})
+	}); err != nil {
+		return err
+	}
+	return s.ensureActiveIndexes(ctx, col)
 }
 
 // Deprecate marks a non-active version deprecated.
