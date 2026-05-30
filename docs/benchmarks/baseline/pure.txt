@@ -2,103 +2,113 @@ goos: darwin
 goarch: amd64
 pkg: github.com/substrate/substrate/internal/policy
 cpu: VirtualApple @ 2.50GHz
-BenchmarkSelect_Small-8   	17697309	        65.36 ns/op	      16 B/op	       1 allocs/op
-BenchmarkSelect_Small-8   	18488037	        65.77 ns/op	      16 B/op	       1 allocs/op
-BenchmarkSelect_Small-8   	18652269	        65.01 ns/op	      16 B/op	       1 allocs/op
-BenchmarkSelect_Small-8   	18327675	        65.50 ns/op	      16 B/op	       1 allocs/op
-BenchmarkSelect_Small-8   	18521852	        65.58 ns/op	      16 B/op	       1 allocs/op
-BenchmarkSelect_Small-8   	18695434	        65.82 ns/op	      16 B/op	       1 allocs/op
-BenchmarkSelect_Small-8   	18259118	        66.77 ns/op	      16 B/op	       1 allocs/op
-BenchmarkSelect_Small-8   	16445799	        68.64 ns/op	      16 B/op	       1 allocs/op
-BenchmarkSelect_Small-8   	17963197	        73.15 ns/op	      16 B/op	       1 allocs/op
-BenchmarkSelect_Small-8   	18433309	        67.01 ns/op	      16 B/op	       1 allocs/op
-BenchmarkSelect_Large-8   	 3491070	       346.3 ns/op	      16 B/op	       1 allocs/op
-BenchmarkSelect_Large-8   	 3530803	       344.0 ns/op	      16 B/op	       1 allocs/op
-BenchmarkSelect_Large-8   	 3572986	       336.6 ns/op	      16 B/op	       1 allocs/op
-BenchmarkSelect_Large-8   	 3576070	       336.0 ns/op	      16 B/op	       1 allocs/op
-BenchmarkSelect_Large-8   	 3540414	       345.2 ns/op	      16 B/op	       1 allocs/op
-BenchmarkSelect_Large-8   	 3567001	       338.6 ns/op	      16 B/op	       1 allocs/op
-BenchmarkSelect_Large-8   	 3553696	       337.2 ns/op	      16 B/op	       1 allocs/op
-BenchmarkSelect_Large-8   	 3527607	       338.2 ns/op	      16 B/op	       1 allocs/op
-BenchmarkSelect_Large-8   	 3570072	       340.2 ns/op	      16 B/op	       1 allocs/op
-BenchmarkSelect_Large-8   	 3558637	       337.7 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Small-8   	13952791	        89.77 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Small-8   	14582188	        90.13 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Small-8   	14277172	        89.88 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Small-8   	14231562	        89.86 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Small-8   	14166660	        89.77 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Small-8   	14024698	        90.21 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Small-8   	14239893	        89.41 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Small-8   	14084230	        89.37 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Small-8   	14172969	        89.92 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Small-8   	14437761	        88.68 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Large-8   	 3423972	       354.2 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Large-8   	 3382414	       354.6 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Large-8   	 3379526	       355.4 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Large-8   	 3397048	       354.7 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Large-8   	 3390357	       354.2 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Large-8   	 3384880	       354.2 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Large-8   	 3380870	       354.9 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Large-8   	 3391305	       354.5 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Large-8   	 3384108	       354.8 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Large-8   	 3396952	       354.6 ns/op	      16 B/op	       1 allocs/op
 PASS
-ok  	github.com/substrate/substrate/internal/policy	29.799s
+ok  	github.com/substrate/substrate/internal/policy	33.095s
 goos: darwin
 goarch: amd64
 pkg: github.com/substrate/substrate/internal/query
 cpu: VirtualApple @ 2.50GHz
-BenchmarkParse-8             	  277765	      3798 ns/op	    1512 B/op	      12 allocs/op
-BenchmarkParse-8             	  328155	      3743 ns/op	    1512 B/op	      12 allocs/op
-BenchmarkParse-8             	  327514	      3724 ns/op	    1512 B/op	      12 allocs/op
-BenchmarkParse-8             	  327164	      3733 ns/op	    1512 B/op	      12 allocs/op
-BenchmarkParse-8             	  322743	      3765 ns/op	    1512 B/op	      12 allocs/op
-BenchmarkParse-8             	  332930	      3720 ns/op	    1512 B/op	      12 allocs/op
-BenchmarkParse-8             	  327948	      3778 ns/op	    1512 B/op	      12 allocs/op
-BenchmarkParse-8             	  327116	      3743 ns/op	    1512 B/op	      12 allocs/op
-BenchmarkParse-8             	  325124	      3747 ns/op	    1512 B/op	      12 allocs/op
-BenchmarkParse-8             	  324975	      3731 ns/op	    1512 B/op	      12 allocs/op
-BenchmarkBuild-8             	  499273	      2274 ns/op	    1752 B/op	      20 allocs/op
-BenchmarkBuild-8             	  532052	      2273 ns/op	    1752 B/op	      20 allocs/op
-BenchmarkBuild-8             	  506227	      2306 ns/op	    1752 B/op	      20 allocs/op
-BenchmarkBuild-8             	  525405	      2279 ns/op	    1752 B/op	      20 allocs/op
-BenchmarkBuild-8             	  522409	      2397 ns/op	    1752 B/op	      20 allocs/op
-BenchmarkBuild-8             	  537241	      2363 ns/op	    1752 B/op	      20 allocs/op
-BenchmarkBuild-8             	  517950	      2321 ns/op	    1752 B/op	      20 allocs/op
-BenchmarkBuild-8             	  496372	      2382 ns/op	    1752 B/op	      20 allocs/op
-BenchmarkBuild-8             	  488338	      2393 ns/op	    1752 B/op	      20 allocs/op
-BenchmarkBuild-8             	  441889	      2605 ns/op	    1752 B/op	      20 allocs/op
-BenchmarkCursorRoundTrip-8   	  325254	      3672 ns/op	     848 B/op	      13 allocs/op
-BenchmarkCursorRoundTrip-8   	  329115	      3677 ns/op	     848 B/op	      13 allocs/op
-BenchmarkCursorRoundTrip-8   	  330698	      3627 ns/op	     848 B/op	      13 allocs/op
-BenchmarkCursorRoundTrip-8   	  335853	      3617 ns/op	     848 B/op	      13 allocs/op
-BenchmarkCursorRoundTrip-8   	  330223	      3618 ns/op	     848 B/op	      13 allocs/op
-BenchmarkCursorRoundTrip-8   	  336238	      3583 ns/op	     848 B/op	      13 allocs/op
-BenchmarkCursorRoundTrip-8   	  333943	      3643 ns/op	     848 B/op	      13 allocs/op
-BenchmarkCursorRoundTrip-8   	  331230	      3566 ns/op	     848 B/op	      13 allocs/op
-BenchmarkCursorRoundTrip-8   	  339249	      3628 ns/op	     848 B/op	      13 allocs/op
-BenchmarkCursorRoundTrip-8   	  334197	      3576 ns/op	     848 B/op	      13 allocs/op
+BenchmarkParse-8             	  280970	      3944 ns/op	    1512 B/op	      12 allocs/op
+BenchmarkParse-8             	  319681	      3918 ns/op	    1512 B/op	      12 allocs/op
+BenchmarkParse-8             	  323289	      3876 ns/op	    1512 B/op	      12 allocs/op
+BenchmarkParse-8             	  317596	      3916 ns/op	    1512 B/op	      12 allocs/op
+BenchmarkParse-8             	  315000	      3877 ns/op	    1512 B/op	      12 allocs/op
+BenchmarkParse-8             	  319779	      3869 ns/op	    1512 B/op	      12 allocs/op
+BenchmarkParse-8             	  317143	      3859 ns/op	    1512 B/op	      12 allocs/op
+BenchmarkParse-8             	  321690	      3862 ns/op	    1512 B/op	      12 allocs/op
+BenchmarkParse-8             	  321171	      3866 ns/op	    1512 B/op	      12 allocs/op
+BenchmarkParse-8             	  317738	      3847 ns/op	    1512 B/op	      12 allocs/op
+BenchmarkBuild-8             	  609450	      2043 ns/op	    1480 B/op	      12 allocs/op
+BenchmarkBuild-8             	  612146	      2053 ns/op	    1480 B/op	      12 allocs/op
+BenchmarkBuild-8             	  643512	      2058 ns/op	    1480 B/op	      12 allocs/op
+BenchmarkBuild-8             	  624312	      2040 ns/op	    1480 B/op	      12 allocs/op
+BenchmarkBuild-8             	  623066	      2054 ns/op	    1480 B/op	      12 allocs/op
+BenchmarkBuild-8             	  630704	      2044 ns/op	    1480 B/op	      12 allocs/op
+BenchmarkBuild-8             	  637299	      2046 ns/op	    1480 B/op	      12 allocs/op
+BenchmarkBuild-8             	  634150	      2031 ns/op	    1480 B/op	      12 allocs/op
+BenchmarkBuild-8             	  640045	      2030 ns/op	    1480 B/op	      12 allocs/op
+BenchmarkBuild-8             	  637484	      2033 ns/op	    1480 B/op	      12 allocs/op
+BenchmarkCursorRoundTrip-8   	  636141	      1805 ns/op	     874 B/op	      12 allocs/op
+BenchmarkCursorRoundTrip-8   	  699838	      1800 ns/op	     874 B/op	      12 allocs/op
+BenchmarkCursorRoundTrip-8   	  665060	      1795 ns/op	     871 B/op	      12 allocs/op
+BenchmarkCursorRoundTrip-8   	  695008	      1795 ns/op	     875 B/op	      12 allocs/op
+BenchmarkCursorRoundTrip-8   	  703852	      1801 ns/op	     868 B/op	      12 allocs/op
+BenchmarkCursorRoundTrip-8   	  663662	      1809 ns/op	     873 B/op	      12 allocs/op
+BenchmarkCursorRoundTrip-8   	  700501	      1793 ns/op	     874 B/op	      12 allocs/op
+BenchmarkCursorRoundTrip-8   	  680187	      1791 ns/op	     872 B/op	      12 allocs/op
+BenchmarkCursorRoundTrip-8   	  705546	      1807 ns/op	     874 B/op	      12 allocs/op
+BenchmarkCursorRoundTrip-8   	  676843	      1797 ns/op	     870 B/op	      12 allocs/op
 PASS
-ok  	github.com/substrate/substrate/internal/query	38.864s
+ok  	github.com/substrate/substrate/internal/query	39.329s
 goos: darwin
 goarch: amd64
 pkg: github.com/substrate/substrate/internal/schema
 cpu: VirtualApple @ 2.50GHz
-BenchmarkValidateWrite-8   	  225973	      4770 ns/op	    2746 B/op	      57 allocs/op
-BenchmarkValidateWrite-8   	  235275	      5145 ns/op	    2746 B/op	      57 allocs/op
-BenchmarkValidateWrite-8   	  255325	      5261 ns/op	    2746 B/op	      57 allocs/op
-BenchmarkValidateWrite-8   	  220089	      5056 ns/op	    2746 B/op	      57 allocs/op
-BenchmarkValidateWrite-8   	  257376	      5071 ns/op	    2746 B/op	      57 allocs/op
-BenchmarkValidateWrite-8   	  233464	      4856 ns/op	    2746 B/op	      57 allocs/op
-BenchmarkValidateWrite-8   	  234865	      5256 ns/op	    2746 B/op	      57 allocs/op
-BenchmarkValidateWrite-8   	  232682	      5308 ns/op	    2746 B/op	      57 allocs/op
-BenchmarkValidateWrite-8   	  224492	      5322 ns/op	    2746 B/op	      57 allocs/op
-BenchmarkValidateWrite-8   	  233714	      4996 ns/op	    2746 B/op	      57 allocs/op
-BenchmarkClassify-8        	  263817	      4594 ns/op	     224 B/op	      12 allocs/op
-BenchmarkClassify-8        	  230912	      5847 ns/op	     224 B/op	      12 allocs/op
-BenchmarkClassify-8        	  205845	      5701 ns/op	     224 B/op	      12 allocs/op
-BenchmarkClassify-8        	  196927	      6607 ns/op	     224 B/op	      12 allocs/op
-BenchmarkClassify-8        	  201350	      5803 ns/op	     224 B/op	      12 allocs/op
-BenchmarkClassify-8        	  211761	      5544 ns/op	     224 B/op	      12 allocs/op
-BenchmarkClassify-8        	  209835	      5452 ns/op	     224 B/op	      12 allocs/op
-BenchmarkClassify-8        	  213942	      6995 ns/op	     224 B/op	      12 allocs/op
-BenchmarkClassify-8        	  209134	      5563 ns/op	     224 B/op	      12 allocs/op
-BenchmarkClassify-8        	  229936	      6664 ns/op	     224 B/op	      12 allocs/op
+BenchmarkValidateWrite-8   	  218586	      4709 ns/op	    2747 B/op	      57 allocs/op
+BenchmarkValidateWrite-8   	  256398	      4718 ns/op	    2747 B/op	      57 allocs/op
+BenchmarkValidateWrite-8   	  266385	      4516 ns/op	    2747 B/op	      57 allocs/op
+BenchmarkValidateWrite-8   	  266446	      4584 ns/op	    2747 B/op	      57 allocs/op
+BenchmarkValidateWrite-8   	  260379	      4637 ns/op	    2747 B/op	      57 allocs/op
+BenchmarkValidateWrite-8   	  257390	      4641 ns/op	    2747 B/op	      57 allocs/op
+BenchmarkValidateWrite-8   	  262580	      4630 ns/op	    2747 B/op	      57 allocs/op
+BenchmarkValidateWrite-8   	  247382	      4691 ns/op	    2747 B/op	      57 allocs/op
+BenchmarkValidateWrite-8   	  257119	      4604 ns/op	    2747 B/op	      57 allocs/op
+BenchmarkValidateWrite-8   	  259201	      4643 ns/op	    2747 B/op	      57 allocs/op
+BenchmarkClassify-8        	  260589	      4751 ns/op	     224 B/op	      12 allocs/op
+BenchmarkClassify-8        	  257900	      4690 ns/op	     224 B/op	      12 allocs/op
+BenchmarkClassify-8        	  256593	      4660 ns/op	     224 B/op	      12 allocs/op
+BenchmarkClassify-8        	  258844	      4746 ns/op	     224 B/op	      12 allocs/op
+BenchmarkClassify-8        	  257395	      4678 ns/op	     224 B/op	      12 allocs/op
+BenchmarkClassify-8        	  257684	      4720 ns/op	     224 B/op	      12 allocs/op
+BenchmarkClassify-8        	  255864	      4876 ns/op	     224 B/op	      12 allocs/op
+BenchmarkClassify-8        	  253906	      4796 ns/op	     224 B/op	      12 allocs/op
+BenchmarkClassify-8        	  257956	      4644 ns/op	     224 B/op	      12 allocs/op
+BenchmarkClassify-8        	  256808	      4651 ns/op	     224 B/op	      12 allocs/op
 PASS
-ok  	github.com/substrate/substrate/internal/schema	31.151s
+ok  	github.com/substrate/substrate/internal/schema	26.226s
 goos: darwin
 goarch: amd64
 pkg: github.com/substrate/substrate/internal/projection
 cpu: VirtualApple @ 2.50GHz
-BenchmarkApplyDefaults-8   	   83294	     15089 ns/op	    2256 B/op	      43 allocs/op
-BenchmarkApplyDefaults-8   	   83371	     14768 ns/op	    2256 B/op	      43 allocs/op
-BenchmarkApplyDefaults-8   	   86408	     14334 ns/op	    2256 B/op	      43 allocs/op
-BenchmarkApplyDefaults-8   	   86461	     14633 ns/op	    2256 B/op	      43 allocs/op
-BenchmarkApplyDefaults-8   	   78525	     14701 ns/op	    2256 B/op	      43 allocs/op
-BenchmarkApplyDefaults-8   	   74244	     15025 ns/op	    2256 B/op	      43 allocs/op
-BenchmarkApplyDefaults-8   	   88440	     13867 ns/op	    2256 B/op	      43 allocs/op
-BenchmarkApplyDefaults-8   	   84042	     14423 ns/op	    2256 B/op	      43 allocs/op
-BenchmarkApplyDefaults-8   	   86006	     13825 ns/op	    2256 B/op	      43 allocs/op
-BenchmarkApplyDefaults-8   	   85958	     16904 ns/op	    2256 B/op	      43 allocs/op
+BenchmarkApplyDefaults-8   	  451428	      2456 ns/op	    1259 B/op	      21 allocs/op
+BenchmarkApplyDefaults-8   	  498333	      2422 ns/op	    1257 B/op	      21 allocs/op
+BenchmarkApplyDefaults-8   	  508572	      2395 ns/op	    1262 B/op	      21 allocs/op
+BenchmarkApplyDefaults-8   	  513982	      2409 ns/op	    1261 B/op	      21 allocs/op
+BenchmarkApplyDefaults-8   	  525436	      2401 ns/op	    1258 B/op	      21 allocs/op
+BenchmarkApplyDefaults-8   	  517834	      2357 ns/op	    1258 B/op	      21 allocs/op
+BenchmarkApplyDefaults-8   	  540856	      2339 ns/op	    1261 B/op	      21 allocs/op
+BenchmarkApplyDefaults-8   	  518583	      2391 ns/op	    1260 B/op	      21 allocs/op
+BenchmarkApplyDefaults-8   	  511249	      2399 ns/op	    1260 B/op	      21 allocs/op
+BenchmarkApplyDefaults-8   	  515769	      2390 ns/op	    1259 B/op	      21 allocs/op
+BenchmarkParseDefaults-8   	  292210	      4020 ns/op	    1262 B/op	      16 allocs/op
+BenchmarkParseDefaults-8   	  297212	      4018 ns/op	    1260 B/op	      16 allocs/op
+BenchmarkParseDefaults-8   	  296116	      4963 ns/op	    1261 B/op	      16 allocs/op
+BenchmarkParseDefaults-8   	  255769	      4023 ns/op	    1258 B/op	      16 allocs/op
+BenchmarkParseDefaults-8   	  296568	      3982 ns/op	    1261 B/op	      16 allocs/op
+BenchmarkParseDefaults-8   	  300800	      3963 ns/op	    1263 B/op	      16 allocs/op
+BenchmarkParseDefaults-8   	  303403	      3981 ns/op	    1263 B/op	      16 allocs/op
+BenchmarkParseDefaults-8   	  303451	      3965 ns/op	    1263 B/op	      16 allocs/op
+BenchmarkParseDefaults-8   	  304890	      6042 ns/op	    1261 B/op	      16 allocs/op
+BenchmarkParseDefaults-8   	  178698	      9201 ns/op	    1262 B/op	      16 allocs/op
 PASS
-ok  	github.com/substrate/substrate/internal/projection	15.631s
+ok  	github.com/substrate/substrate/internal/projection	27.337s
