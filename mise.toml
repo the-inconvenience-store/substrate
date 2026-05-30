@@ -1,2 +1,30 @@
 [tools]
 go = "1.26.3"
+
+[tasks.build]
+description = "Build all packages"
+run = "go build ./..."
+
+[tasks.test]
+description = "Run unit tests"
+run = "go test ./..."
+
+[tasks."test:integration"]
+description = "Run integration tests (requires Docker)"
+run = "go test -tags=integration ./..."
+
+[tasks."test:all"]
+description = "Run unit and integration tests"
+depends = ["test", "test:integration"]
+
+[tasks.vet]
+description = "Run go vet"
+run = "go vet ./..."
+
+[tasks."sqlc:generate"]
+description = "Regenerate the sqlc db package"
+run = "go tool sqlc generate"
+
+[tasks.run]
+description = "Run the server"
+run = "go run ./cmd/substrate"
