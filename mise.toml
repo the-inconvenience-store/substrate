@@ -42,8 +42,14 @@ description = "Run HTTP end-to-end benchmarks (requires Docker)"
 run = "go test -tags=integration -run '^$' -bench . -benchmem -count=10 ./internal/api/..."
 
 [tasks.bench]
-description = "Run all benchmark groups"
-depends = ["bench:pure", "bench:db", "bench:http"]
+description = "Run all benchmark groups, teeing combined output to docs/benchmarks/runs/<timestamp>.txt"
+run = '''
+mkdir -p docs/benchmarks/runs
+out="docs/benchmarks/runs/$(date +%Y%m%dT%H%M%S).txt"
+{ go test -run '^$' -bench . -benchmem -count=10 ./internal/policy/... ./internal/query/... ./internal/schema/... ./internal/projection/... && \
+  go test -tags=integration -run '^$' -bench . -benchmem -count=10 ./internal/record/... && \
+  go test -tags=integration -run '^$' -bench . -benchmem -count=10 ./internal/api/...; } | tee "$out"
+'''
 
 [tasks."bench:baseline"]
 description = "Refresh committed baselines (overwrites docs/benchmarks/baseline/*.txt)"
