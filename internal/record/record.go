@@ -15,6 +15,7 @@ import (
 
 	"github.com/substrate/substrate/internal/apierr"
 	"github.com/substrate/substrate/internal/db"
+	"github.com/substrate/substrate/internal/policy"
 	"github.com/substrate/substrate/internal/query"
 	"github.com/substrate/substrate/internal/store"
 )
@@ -60,11 +61,32 @@ type Service struct {
 	pool      *pgxpool.Pool
 	q         *db.Queries
 	validator Validator
+	eval      policy.Evaluator
 }
 
 // New builds a record service. validator may be nil (flexible-only; no validation).
 func New(pool *pgxpool.Pool, validator Validator) *Service {
 	return &Service{pool: pool, q: db.New(pool), validator: validator}
+}
+
+// WithEvaluator wires an optional policy evaluator. nil ⇒ no enforcement.
+func (s *Service) WithEvaluator(e policy.Evaluator) *Service { s.eval = e; return s }
+
+// authorize runs the policy check for an operation. With no evaluator it allows.
+func (s *Service) authorize(ctx context.Context, req policy.Request) (policy.Decision, error) {
+	if s.eval == nil {
+		return policy.Decision{Effect: "allow", Reason: "no_evaluator"}, nil
+	}
+	return s.eval.Authorize(ctx, req)
+}
+
+// policyTrace returns the trace bytes for an allowed event, or nil when no
+// evaluator is wired (preserving the pre-policy NULL-trace behavior).
+func (s *Service) policyTrace(dec policy.Decision, op string) []byte {
+	if s.eval == nil {
+		return nil
+	}
+	return dec.TraceJSON(op)
 }
 
 // schemaVersionParam validates (if a validator is configured) and returns the
@@ -84,6 +106,13 @@ func (s *Service) schemaVersionParam(ctx context.Context, col uuid.UUID, data ma
 }
 
 func (s *Service) Create(ctx context.Context, cmd CreateCmd) (Record, error) {
+	dec, err := s.authorize(ctx, policy.Request{
+		Workspace: cmd.Workspace, Actor: cmd.Actor, Collection: cmd.Collection,
+		Target: uuid.Nil, Operation: policy.OpCreate,
+	})
+	if err != nil {
+		return Record{}, err
+	}
 	rec := Record{
 		ID: uuid.New(), Collection: cmd.Collection, Data: cmd.Data,
 		Revision: 1, Status: "active", Actor: cmd.Actor,
@@ -109,6 +138,7 @@ func (s *Service) Create(ctx context.Context, cmd CreateCmd) (Record, error) {
 			Workspace: cmd.Workspace, Collection: cmd.Collection, RecordID: rec.ID,
 			Type: "create", Revision: 1, State: rec.Data, Actor: cmd.Actor,
 			IdempotencyKey: cmd.IdempotencyKey,
+			Trace:          s.policyTrace(dec, policy.OpCreate),
 		}); err != nil {
 			return err
 		}
@@ -210,6 +240,13 @@ func (s *Service) List(ctx context.Context, ws, col uuid.UUID, q query.ListQuery
 }
 
 func (s *Service) Update(ctx context.Context, cmd UpdateCmd) (Record, error) {
+	dec, aerr := s.authorize(ctx, policy.Request{
+		Workspace: cmd.Workspace, Actor: cmd.Actor, Collection: cmd.Collection,
+		Target: cmd.ID, Operation: policy.OpUpdate,
+	})
+	if aerr != nil {
+		return Record{}, aerr
+	}
 	var rec Record
 	err := store.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
 		qtx := s.q.WithTx(tx)
@@ -246,6 +283,7 @@ func (s *Service) Update(ctx context.Context, cmd UpdateCmd) (Record, error) {
 			Workspace: cmd.Workspace, Collection: cmd.Collection, RecordID: cmd.ID,
 			Type: "update", Revision: next, State: cmd.Data, Actor: cmd.Actor,
 			IdempotencyKey: cmd.IdempotencyKey,
+			Trace:          s.policyTrace(dec, policy.OpUpdate),
 		}); err != nil {
 			return err
 		}
@@ -278,6 +316,12 @@ func (s *Service) Update(ctx context.Context, cmd UpdateCmd) (Record, error) {
 }
 
 func (s *Service) Delete(ctx context.Context, ws, col, id uuid.UUID, actor string) error {
+	dec, err := s.authorize(ctx, policy.Request{
+		Workspace: ws, Actor: actor, Collection: col, Target: id, Operation: policy.OpDelete,
+	})
+	if err != nil {
+		return err
+	}
 	return store.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
 		qtx := s.q.WithTx(tx)
 		row, err := qtx.GetRecordForUpdate(ctx, db.GetRecordForUpdateParams{
@@ -295,6 +339,7 @@ func (s *Service) Delete(ctx context.Context, ws, col, id uuid.UUID, actor strin
 		if err := appendEvent(ctx, qtx, eventRow{
 			Workspace: ws, Collection: col, RecordID: id,
 			Type: "delete", Revision: next, State: data, Actor: actor,
+			Trace: s.policyTrace(dec, policy.OpDelete),
 		}); err != nil {
 			return err
 		}
@@ -315,6 +360,7 @@ type eventRow struct {
 	State          map[string]any
 	Actor          string
 	IdempotencyKey string
+	Trace          []byte
 }
 
 // errIdempotencyConflict is a sentinel returned by appendEvent when the INSERT
@@ -328,6 +374,7 @@ func appendEvent(ctx context.Context, q *db.Queries, e eventRow) error {
 		RecordID: e.RecordID, Type: e.Type, Revision: e.Revision,
 		StateAfter: mustJSON(e.State), Actor: textOrNull(e.Actor),
 		IdempotencyKey: textOrNull(e.IdempotencyKey),
+		Trace:          e.Trace,
 	})
 	if err != nil {
 		var pgErr *pgconn.PgError
