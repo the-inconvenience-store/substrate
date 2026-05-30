@@ -112,7 +112,7 @@ func (sh *schemaHandlers) deprecate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, apierr.New(apierr.BadRequest, "invalid version"))
 		return
 	}
-	if err := sh.schemas.Deprecate(r.Context(), c.ID, ver); err != nil {
+	if err := sh.schemas.Deprecate(r.Context(), c.WorkspaceID, c.ID, ver, auth.ActorFrom(r.Context())); err != nil {
 		writeErr(w, err)
 		return
 	}

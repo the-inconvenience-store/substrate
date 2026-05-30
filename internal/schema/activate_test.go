@@ -125,7 +125,7 @@ func TestSchemaLifecycleEventsEmitted(t *testing.T) {
 	}
 
 	// deprecate v1 explicitly → schema_deprecated
-	if err := svc.Deprecate(ctx, col, 1); err != nil {
+	if err := svc.Deprecate(ctx, ws, col, 1, "tester"); err != nil {
 		t.Fatalf("deprecate v1: %v", err)
 	}
 
@@ -189,7 +189,7 @@ func TestDeprecate(t *testing.T) {
 	}
 	v2, _ := svc.Register(ctx, RegisterCmd{Workspace: ws, Collection: col, JSONSchema: v2doc, Activate: true})
 	// Now deprecate v1.
-	if err := svc.Deprecate(ctx, col, 1); err != nil {
+	if err := svc.Deprecate(ctx, ws, col, 1, "tester"); err != nil {
 		t.Fatalf("deprecate: %v", err)
 	}
 	got, _ := svc.Get(ctx, col, 1)
