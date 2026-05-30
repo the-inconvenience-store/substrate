@@ -1,0 +1,104 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/substrate/substrate/internal/policy
+cpu: Apple M1
+BenchmarkSelect_Small-8   	17766831	        59.49 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Small-8   	19528030	        58.28 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Small-8   	20541686	        59.02 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Small-8   	20601874	        58.75 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Small-8   	20355542	        58.38 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Small-8   	20699037	        58.25 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Small-8   	20428761	        58.33 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Small-8   	20486730	        58.58 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Small-8   	20658429	        58.20 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Small-8   	20815023	        58.18 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Large-8   	 3314070	       363.0 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Large-8   	 3046280	       359.9 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Large-8   	 3339318	       369.0 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Large-8   	 3302550	       365.2 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Large-8   	 3279776	       364.9 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Large-8   	 3297964	       362.4 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Large-8   	 3310094	       362.1 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Large-8   	 3291391	       393.7 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Large-8   	 3306087	       362.2 ns/op	      16 B/op	       1 allocs/op
+BenchmarkSelect_Large-8   	 3314242	       362.5 ns/op	      16 B/op	       1 allocs/op
+PASS
+ok  	github.com/substrate/substrate/internal/policy	29.323s
+goos: darwin
+goarch: arm64
+pkg: github.com/substrate/substrate/internal/query
+cpu: Apple M1
+BenchmarkParse-8             	  534621	      2248 ns/op	    1512 B/op	      12 allocs/op
+BenchmarkParse-8             	  538287	      2228 ns/op	    1512 B/op	      12 allocs/op
+BenchmarkParse-8             	  532692	      2583 ns/op	    1512 B/op	      12 allocs/op
+BenchmarkParse-8             	  532844	      2275 ns/op	    1512 B/op	      12 allocs/op
+BenchmarkParse-8             	  543986	      2253 ns/op	    1512 B/op	      12 allocs/op
+BenchmarkParse-8             	  535896	      2262 ns/op	    1512 B/op	      12 allocs/op
+BenchmarkParse-8             	  520549	      2233 ns/op	    1512 B/op	      12 allocs/op
+BenchmarkParse-8             	  530208	      2256 ns/op	    1512 B/op	      12 allocs/op
+BenchmarkParse-8             	  528648	      2239 ns/op	    1512 B/op	      12 allocs/op
+BenchmarkParse-8             	  536881	      2228 ns/op	    1512 B/op	      12 allocs/op
+BenchmarkBuild-8             	  710212	      1667 ns/op	    1752 B/op	      20 allocs/op
+BenchmarkBuild-8             	  663181	      1827 ns/op	    1752 B/op	      20 allocs/op
+BenchmarkBuild-8             	  707656	      1656 ns/op	    1752 B/op	      20 allocs/op
+BenchmarkBuild-8             	  713059	      1662 ns/op	    1752 B/op	      20 allocs/op
+BenchmarkBuild-8             	  723237	      1674 ns/op	    1752 B/op	      20 allocs/op
+BenchmarkBuild-8             	  722655	      1679 ns/op	    1752 B/op	      20 allocs/op
+BenchmarkBuild-8             	  714454	      1657 ns/op	    1752 B/op	      20 allocs/op
+BenchmarkBuild-8             	  705474	      1684 ns/op	    1752 B/op	      20 allocs/op
+BenchmarkBuild-8             	  710469	      1662 ns/op	    1752 B/op	      20 allocs/op
+BenchmarkBuild-8             	  708458	      1686 ns/op	    1752 B/op	      20 allocs/op
+BenchmarkCursorRoundTrip-8   	  634968	      1874 ns/op	     848 B/op	      13 allocs/op
+BenchmarkCursorRoundTrip-8   	  631125	      1872 ns/op	     848 B/op	      13 allocs/op
+BenchmarkCursorRoundTrip-8   	  628196	      1870 ns/op	     848 B/op	      13 allocs/op
+BenchmarkCursorRoundTrip-8   	  628458	      1927 ns/op	     848 B/op	      13 allocs/op
+BenchmarkCursorRoundTrip-8   	  632850	      2364 ns/op	     848 B/op	      13 allocs/op
+BenchmarkCursorRoundTrip-8   	  637699	      1873 ns/op	     848 B/op	      13 allocs/op
+BenchmarkCursorRoundTrip-8   	  645787	      1902 ns/op	     848 B/op	      13 allocs/op
+BenchmarkCursorRoundTrip-8   	  645978	      1902 ns/op	     848 B/op	      13 allocs/op
+BenchmarkCursorRoundTrip-8   	  638098	      2042 ns/op	     848 B/op	      13 allocs/op
+BenchmarkCursorRoundTrip-8   	  493788	      2091 ns/op	     848 B/op	      13 allocs/op
+PASS
+ok  	github.com/substrate/substrate/internal/query	39.115s
+goos: darwin
+goarch: arm64
+pkg: github.com/substrate/substrate/internal/schema
+cpu: Apple M1
+BenchmarkValidateWrite-8   	  319297	      3744 ns/op	    2746 B/op	      57 allocs/op
+BenchmarkValidateWrite-8   	  358581	      3304 ns/op	    2746 B/op	      57 allocs/op
+BenchmarkValidateWrite-8   	  364030	      3376 ns/op	    2746 B/op	      57 allocs/op
+BenchmarkValidateWrite-8   	  356718	      3388 ns/op	    2746 B/op	      57 allocs/op
+BenchmarkValidateWrite-8   	  355105	      3786 ns/op	    2746 B/op	      57 allocs/op
+BenchmarkValidateWrite-8   	  368757	      3363 ns/op	    2746 B/op	      57 allocs/op
+BenchmarkValidateWrite-8   	  359044	      3368 ns/op	    2746 B/op	      57 allocs/op
+BenchmarkValidateWrite-8   	  354458	      3372 ns/op	    2746 B/op	      57 allocs/op
+BenchmarkValidateWrite-8   	  358276	      3412 ns/op	    2746 B/op	      57 allocs/op
+BenchmarkValidateWrite-8   	  358422	      3408 ns/op	    2746 B/op	      57 allocs/op
+BenchmarkClassify-8        	  376443	      3325 ns/op	     224 B/op	      12 allocs/op
+BenchmarkClassify-8        	  368254	      3205 ns/op	     224 B/op	      12 allocs/op
+BenchmarkClassify-8        	  375897	      3247 ns/op	     224 B/op	      12 allocs/op
+BenchmarkClassify-8        	  374266	      3232 ns/op	     224 B/op	      12 allocs/op
+BenchmarkClassify-8        	  376300	      3352 ns/op	     224 B/op	      12 allocs/op
+BenchmarkClassify-8        	  376792	      3200 ns/op	     224 B/op	      12 allocs/op
+BenchmarkClassify-8        	  372397	      3272 ns/op	     224 B/op	      12 allocs/op
+BenchmarkClassify-8        	  375384	      3187 ns/op	     224 B/op	      12 allocs/op
+BenchmarkClassify-8        	  377300	      3197 ns/op	     224 B/op	      12 allocs/op
+BenchmarkClassify-8        	  363614	      3260 ns/op	     224 B/op	      12 allocs/op
+PASS
+ok  	github.com/substrate/substrate/internal/schema	26.356s
+goos: darwin
+goarch: arm64
+pkg: github.com/substrate/substrate/internal/projection
+cpu: Apple M1
+BenchmarkApplyDefaults-8   	  159192	      6943 ns/op	    2256 B/op	      43 allocs/op
+BenchmarkApplyDefaults-8   	  175082	      7090 ns/op	    2256 B/op	      43 allocs/op
+BenchmarkApplyDefaults-8   	  174106	      6889 ns/op	    2256 B/op	      43 allocs/op
+BenchmarkApplyDefaults-8   	  177092	      6812 ns/op	    2256 B/op	      43 allocs/op
+BenchmarkApplyDefaults-8   	  176876	      7266 ns/op	    2256 B/op	      43 allocs/op
+BenchmarkApplyDefaults-8   	  170960	      6815 ns/op	    2256 B/op	      43 allocs/op
+BenchmarkApplyDefaults-8   	  175725	      7553 ns/op	    2256 B/op	      43 allocs/op
+BenchmarkApplyDefaults-8   	  173750	      6949 ns/op	    2256 B/op	      43 allocs/op
+BenchmarkApplyDefaults-8   	  172766	      6854 ns/op	    2256 B/op	      43 allocs/op
+BenchmarkApplyDefaults-8   	  178036	      6879 ns/op	    2256 B/op	      43 allocs/op
+PASS
+ok  	github.com/substrate/substrate/internal/projection	13.245s
