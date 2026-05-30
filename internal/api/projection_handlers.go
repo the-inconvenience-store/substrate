@@ -7,18 +7,39 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/substrate/substrate/internal/apierr"
+	"github.com/substrate/substrate/internal/auth"
+	"github.com/substrate/substrate/internal/collection"
 	"github.com/substrate/substrate/internal/httpx"
+	"github.com/substrate/substrate/internal/policy"
 	"github.com/substrate/substrate/internal/projection"
 )
 
 type projectionHandlers struct {
 	h          *handlers
 	backfiller *projection.Backfiller
+	eval       policy.Evaluator
+}
+
+// authorize gates a backfill-management operation. With no evaluator wired it
+// allows; on deny the evaluator records a policy_denied event and returns Forbidden.
+func (p *projectionHandlers) authorize(r *http.Request, c collection.Collection, op string) error {
+	if p.eval == nil {
+		return nil
+	}
+	_, err := p.eval.Authorize(r.Context(), policy.Request{
+		Workspace: c.WorkspaceID, Actor: auth.ActorFrom(r.Context()),
+		Collection: c.ID, Target: c.ID, Operation: op,
+	})
+	return err
 }
 
 func (p *projectionHandlers) backfill(w http.ResponseWriter, r *http.Request) {
 	c, err := p.h.resolveCollection(r, r.PathValue("collection"))
 	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	if err := p.authorize(r, c, policy.OpBackfill); err != nil {
 		writeErr(w, err)
 		return
 	}
@@ -33,6 +54,10 @@ func (p *projectionHandlers) backfill(w http.ResponseWriter, r *http.Request) {
 func (p *projectionHandlers) setAutoBackfill(w http.ResponseWriter, r *http.Request) {
 	c, err := p.h.resolveCollection(r, r.PathValue("collection"))
 	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	if err := p.authorize(r, c, policy.OpBackfill); err != nil {
 		writeErr(w, err)
 		return
 	}

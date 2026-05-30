@@ -72,6 +72,7 @@ func main() {
 		Audit:       audit.New(pool),
 		Backfiller:  backfiller,
 		Replayer:    projection.NewReplayer(pool),
+		Evaluator:   engine,
 		AdminToken:  cfg.AdminToken,
 	})
 

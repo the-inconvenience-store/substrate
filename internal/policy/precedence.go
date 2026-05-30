@@ -12,12 +12,16 @@ const (
 	OpRegisterSchema  = "register_schema"
 	OpActivateSchema  = "activate_schema"
 	OpDeprecateSchema = "deprecate_schema"
+	// OpBackfill gates the backfill-management surface: triggering a manual
+	// backfill and toggling a collection's auto_backfill flag.
+	OpBackfill = "backfill"
 )
 
 // ValidOperations is the set of operation tokens accepted on rule creation.
 var ValidOperations = map[string]bool{
 	OpCreate: true, OpRead: true, OpUpdate: true, OpDelete: true,
 	OpRegisterSchema: true, OpActivateSchema: true, OpDeprecateSchema: true,
+	OpBackfill: true,
 }
 
 // Rule is one loaded policy row. CollectionWildcard is true when collection_id is NULL.
