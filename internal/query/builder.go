@@ -64,7 +64,17 @@ func Build(q ListQuery) (string, []any, error) {
 		return "$" + strconv.Itoa(len(args)+2)
 	}
 
-	b.WriteString("SELECT id, collection_id, data, revision, status, actor, created_at\n")
+	sortField := q.Sort[0].Field
+	sortExpr := colExpr(sortField)
+	dir := "ASC"
+	cmp := ">"
+	if q.Sort[0].Desc {
+		dir, cmp = "DESC", "<"
+	}
+
+	b.WriteString("SELECT id, collection_id, data, revision, status, actor, created_at, (")
+	b.WriteString(sortExpr)
+	b.WriteString(")::text AS sort_key\n")
 	b.WriteString("FROM records\n")
 	b.WriteString("WHERE workspace_id = $1 AND collection_id = $2 AND status = 'active'")
 
@@ -92,14 +102,6 @@ func Build(q ListQuery) (string, []any, error) {
 		}
 	}
 
-	sortField := q.Sort[0].Field
-	sortExpr := colExpr(sortField)
-	dir := "ASC"
-	cmp := ">"
-	if q.Sort[0].Desc {
-		dir, cmp = "DESC", "<"
-	}
-
 	if q.Cursor != "" {
 		c, err := decodeCursor(q.Cursor)
 		if err != nil {
@@ -118,4 +120,9 @@ func Build(q ListQuery) (string, []any, error) {
 	b.WriteString(fmt.Sprintf("\nLIMIT %d", q.Limit+1))
 
 	return b.String(), args, nil
+}
+
+// NextCursor builds the opaque cursor for the row that ended a page.
+func NextCursor(q ListQuery, sortValue, id string) string {
+	return encodeCursor(cursorData{Sort: normalizeSort(q.Sort), Value: sortValue, ID: id})
 }
