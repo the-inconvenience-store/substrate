@@ -38,3 +38,7 @@ WHERE collection_id = $1 AND version = $2;
 -- name: SetCollectionActiveVersion :exec
 UPDATE collections SET active_schema_version = $2, level = 'typed', updated_at = now()
 WHERE id = $1;
+
+-- name: SetSchemaRationale :exec
+UPDATE schemas SET rationale = $3
+WHERE collection_id = $1 AND version = $2;

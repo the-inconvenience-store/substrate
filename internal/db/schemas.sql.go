@@ -234,3 +234,19 @@ func (q *Queries) SetSchemaLifecycle(ctx context.Context, arg SetSchemaLifecycle
 	_, err := q.db.Exec(ctx, setSchemaLifecycle, arg.CollectionID, arg.Version, arg.Lifecycle)
 	return err
 }
+
+const setSchemaRationale = `-- name: SetSchemaRationale :exec
+UPDATE schemas SET rationale = $3
+WHERE collection_id = $1 AND version = $2
+`
+
+type SetSchemaRationaleParams struct {
+	CollectionID uuid.UUID   `json:"collection_id"`
+	Version      int32       `json:"version"`
+	Rationale    pgtype.Text `json:"rationale"`
+}
+
+func (q *Queries) SetSchemaRationale(ctx context.Context, arg SetSchemaRationaleParams) error {
+	_, err := q.db.Exec(ctx, setSchemaRationale, arg.CollectionID, arg.Version, arg.Rationale)
+	return err
+}

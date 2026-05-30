@@ -115,6 +115,9 @@ func (s *Service) Register(ctx context.Context, cmd RegisterCmd) (SchemaVersion,
 		if err != nil {
 			return err
 		}
+		if err := appendSchemaEvent(ctx, qtx, cmd.Collection, col.WorkspaceID, "schema_registered", int64(next), lifecycle, cmd.Actor); err != nil {
+			return err
+		}
 		if lifecycle == "active" {
 			if err := s.activateTx(ctx, qtx, cmd.Collection, col.WorkspaceID, col.ActiveSchemaVersion, next, cmd.Actor); err != nil {
 				return err
@@ -221,7 +224,7 @@ func (s *Service) activateTx(ctx context.Context, q *db.Queries, col uuid.UUID, 
 	}); err != nil {
 		return err
 	}
-	return appendSchemaEvent(ctx, q, col, ws, "schema_activated", int64(version), actor)
+	return appendSchemaEvent(ctx, q, col, ws, "schema_activated", int64(version), "active", actor)
 }
 
 // Activate makes an existing draft/deprecated version the active one.
@@ -251,6 +254,13 @@ func (s *Service) Activate(ctx context.Context, ws, col uuid.UUID, version int, 
 				return err
 			}
 		}
+		if force && rationale != "" {
+			if err := qtx.SetSchemaRationale(ctx, db.SetSchemaRationaleParams{
+				CollectionID: col, Version: int32(version), Rationale: textOrNull(rationale),
+			}); err != nil {
+				return err
+			}
+		}
 		return s.activateTx(ctx, qtx, col, c.WorkspaceID, c.ActiveSchemaVersion, int32(version), actor)
 	})
 }
@@ -269,18 +279,23 @@ func (s *Service) Deprecate(ctx context.Context, col uuid.UUID, version int) err
 		if c.ActiveSchemaVersion.Valid && c.ActiveSchemaVersion.Int32 == int32(version) {
 			return apierr.New(apierr.Conflict, "cannot deprecate the active version; activate another first")
 		}
-		return qtx.SetSchemaLifecycle(ctx, db.SetSchemaLifecycleParams{
+		if err := qtx.SetSchemaLifecycle(ctx, db.SetSchemaLifecycleParams{
 			CollectionID: col, Version: int32(version), Lifecycle: "deprecated",
-		})
+		}); err != nil {
+			return err
+		}
+		return appendSchemaEvent(ctx, qtx, col, c.WorkspaceID, "schema_deprecated", int64(version), "deprecated", "")
 	})
 }
 
 // appendSchemaEvent records a schema lifecycle change on the events timeline.
 // The event is collection-scoped: record_id is the collection id; revision is the schema version.
-func appendSchemaEvent(ctx context.Context, q *db.Queries, col uuid.UUID, ws uuid.UUID, typ string, version int64, actor string) error {
+// state_after is written as {"version":<n>,"lifecycle":"<lifecycle>"}.
+func appendSchemaEvent(ctx context.Context, q *db.Queries, col uuid.UUID, ws uuid.UUID, typ string, version int64, lifecycle string, actor string) error {
+	stateAfter, _ := json.Marshal(map[string]any{"version": version, "lifecycle": lifecycle})
 	return q.AppendEvent(ctx, db.AppendEventParams{
 		ID: uuid.New(), WorkspaceID: ws, CollectionID: col, RecordID: col,
-		Type: typ, Revision: version, StateAfter: []byte("{}"),
+		Type: typ, Revision: version, StateAfter: stateAfter,
 		Actor: textOrNull(actor), IdempotencyKey: textOrNull(""),
 	})
 }
