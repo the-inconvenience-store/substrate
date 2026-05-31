@@ -2,14 +2,21 @@
 
 Substrate is an event-backed state-object store. This repository contains the v0 foundation: flexible workspace-scoped collections, record CRUD with optimistic concurrency and idempotency, and full time-travel — per-record history, point-in-time reads (`as_of`), and revert to any past revision.
 
+> [!IMPORTANT]  
+> Substrate is unreleased and in early development, contracts are bound to change.
+
+## Who needs Subtrate?
+
+Use Substrate when your agent requires a semi-typed, NoSQL-style document database that it can use to create and update schemas and records in autonomously. Records and schemas are saved as a history of changes (event sourced), so all changes are auditable and are able to be time-travelled to any point in history.
+
 ---
 
 ## Prerequisites
 
-| Tool | Version |
-|------|---------|
-| [Go](https://go.dev/dl/) | 1.26+ |
-| [mise](https://mise.jdx.dev) | any recent |
+| Tool                                          | Version               |
+| --------------------------------------------- | --------------------- |
+| [Go](https://go.dev/dl/)                      | 1.26+                 |
+| [mise](https://mise.jdx.dev)                  | any recent            |
 | [Docker](https://docs.docker.com/get-docker/) | for integration tests |
 
 > This project uses [mise](https://mise.jdx.dev) for the Go toolchain (`mise.toml`) and its task runner. Install it with `brew install mise` or see https://mise.jdx.dev/installing-mise.html, then run `mise install` to pin Go. List tasks with `mise tasks`.
@@ -57,13 +64,13 @@ go run ./cmd/substrate --database-url "postgres://user:pass@localhost:5432/subst
 
 ### Flags
 
-| Flag | Env var | Default | Description |
-|------|---------|---------|-------------|
-| `--addr` | — | `:8080` | Listen address |
-| `--embedded` | `SUBSTRATE_EMBEDDED=true` | `false` | Start an embedded Postgres instance |
-| `--database-url` | `SUBSTRATE_DATABASE_URL` | — | External Postgres DSN |
-| `--admin-token` | `SUBSTRATE_ADMIN_TOKEN` | — | Bootstrap admin token |
-| `--log-level` | — | `info` | Log level |
+| Flag             | Env var                   | Default | Description                         |
+| ---------------- | ------------------------- | ------- | ----------------------------------- |
+| `--addr`         | —                         | `:8080` | Listen address                      |
+| `--embedded`     | `SUBSTRATE_EMBEDDED=true` | `false` | Start an embedded Postgres instance |
+| `--database-url` | `SUBSTRATE_DATABASE_URL`  | —       | External Postgres DSN               |
+| `--admin-token`  | `SUBSTRATE_ADMIN_TOKEN`   | —       | Bootstrap admin token               |
+| `--log-level`    | —                         | `info`  | Log level                           |
 
 ---
 
