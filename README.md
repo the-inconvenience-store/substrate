@@ -9,6 +9,11 @@ Substrate is an event-backed state-object store. This repository contains the v0
 
 Use Substrate when your agent requires a semi-typed, NoSQL-style document database that it can use to create and update schemas and records in autonomously. Records and schemas are saved as a history of changes (event sourced), so all changes are auditable and are able to be time-travelled to any point in history.
 
+## What is the difference between Substrate and other agent memory solutions?
+
+Other agent memory solutions, like Honcho, provide a store for completely unstructured data from agentic turns and user chats.
+Substrate provides a document DB for agents to store structured data in a deterministic way. It's like giving your agent access to a Postgres database, it can create tables (collections), define the schema, run migrations, and create/read/update/delete records (rows) with event-sourced safety guarantees, so if an agent makes a mistake, you can easily rollback in seconds.
+
 ---
 
 ## Prerequisites
